@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -c \"import streamlit as st; help\\(st.plotly_chart\\)\")",
+      "Bash(.venv/bin/python -c \"import streamlit as st; help\\(st.dataframe\\)\")",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pip show *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python3 *)"
+    ]
+  }
+}

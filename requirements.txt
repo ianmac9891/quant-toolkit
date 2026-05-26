@@ -1,0 +1,30 @@
+# Core data + numerics
+pandas>=2.2.0
+numpy>=1.26.0
+pyarrow>=15.0.0           # fast parquet for the local cache
+
+# Market data
+yfinance>=0.2.40          # primary data source
+requests>=2.31.0          # for Alpha Vantage fallback
+
+# Analysis
+scipy>=1.12.0
+statsmodels>=0.14.0
+arch>=6.3.0                 # GARCH volatility models (Tool 7)
+
+# UI
+streamlit>=1.34.0
+plotly>=5.20.0            # interactive charts; better than matplotlib for Streamlit
+
+# Config
+python-dotenv>=1.0.0      # loads .env into os.environ
+
+# Optimization
+cvxpy>=1.3.0
+scikit-learn>=1.4.0
+
+# requests is already a transitive dep; listed here for clarity
+# (FF3 data is fetched directly from Ken French's site — no pandas-datareader needed)
+
+# Dev
+pytest>=8.0.0
