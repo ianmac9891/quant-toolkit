@@ -1,3 +1,11 @@
+import traceback
+
+try:
+    import streamlit as st
+    st.write("App is starting...")
+except Exception as e:
+    print(traceback.format_exc())
+    raise e
 """Streamlit entry point. Run with: streamlit run app.py"""
 
 import streamlit as st
