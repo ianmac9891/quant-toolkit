@@ -58,9 +58,9 @@ drift_pct = st.sidebar.number_input(
     min_value=-50.0, max_value=100.0, value=0.0, step=0.5,
     format="%.1f",
     help=(
-        "Your directional view on this ticker, annualized. "
-        "Leave at 0 for a pure volatility forecast — the cone will be "
-        "centered symmetrically around today's price."
+        "An optional directional return assumption, expressed as an annualized rate. "
+        "At zero, the forecast cone is centered symmetrically on the current price. "
+        "Non-zero values tilt the distribution in the direction of the assumed drift."
     ),
 )
 drift_annual = drift_pct / 100.0
@@ -113,7 +113,7 @@ target_price = float(
         value=float(round(current_price, 2)),
         step=float(round(current_price * 0.01, 2)),
         format="%.2f",
-        help="P(price finishes above this level) is shown on the main page.",
+        help="The probability that the simulated terminal price exceeds this level is displayed in the metrics below the chart.",
     )
 )
 
@@ -125,8 +125,8 @@ with st.spinner("Fitting GARCH model and simulating paths…"):
     except ValueError as e:
         st.error(
             f"**Volatility model error:** {e}  \n"
-            "Try extending the fit window, or check that the ticker has enough "
-            "trading history and isn't a very recent IPO or spinoff."
+            "Extending the fit window may resolve this. Tickers with limited price "
+            "history — such as recent IPOs or spinoffs — may not yield a stationary fit."
         )
         st.stop()
     except Exception as e:
@@ -159,13 +159,13 @@ st.markdown(
 drift_note = (
     ""
     if drift_annual == 0.0
-    else f" (tilted by your {drift_pct:+.1f}% annual drift assumption)"
+    else f" (tilted by a {drift_pct:+.1f}% annual drift assumption)"
 )
 
 st.info(
     f"Over the next **{_months(horizon)}**, {ticker} is most likely to trade between "
     f"**${p25_term:,.2f}** and **${p75_term:,.2f}** — a 50% probability range{drift_note}.  \n"
-    f"**{p_target:.0%}** chance it finishes above your target of **${target_price:,.2f}** "
+    f"**{p_target:.0%}** chance it finishes above the target of **${target_price:,.2f}** "
     f"by {terminal_end_date.date()}.  \n"
     f"**{p_current:.0%}** chance it finishes above today's price of **${current_price:,.2f}**."
 )
@@ -254,7 +254,7 @@ st.caption(
     + (
         "Centered on zero drift (no directional view)."
         if drift_annual == 0.0
-        else f"Tilted by your {drift_pct:+.1f}%/year drift assumption."
+        else f"Tilted by a {drift_pct:+.1f}%/year drift assumption."
     )
 )
 
@@ -298,18 +298,19 @@ st.markdown(
 )
 if fit.vol_regime == "elevated":
     st.caption(
-        "Elevated volatility means options are relatively expensive right now — "
-        "implied vol tends to track realised vol, so sellers of options earn more premium, "
-        "while buyers pay more for protection."
+        "Elevated volatility indicates options are relatively expensive — "
+        "implied volatility tends to track realized volatility, so option sellers "
+        "collect higher premiums while option buyers pay more for protection."
     )
 elif fit.vol_regime == "compressed":
     st.caption(
-        "Compressed volatility means options are relatively cheap right now — "
-        "protection is inexpensive, though low vol periods can end abruptly."
+        "Compressed volatility indicates options are relatively inexpensive — "
+        "protection costs less in this environment, though low-volatility regimes "
+        "can reverse abruptly."
     )
 else:
     st.caption(
-        "Volatility is in its normal historical range for this ticker."
+        "Volatility is within the normal historical range for this ticker."
     )
 
 # ── 5. Model details (collapsed) ─────────────────────────────────────────────

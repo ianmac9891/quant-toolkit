@@ -105,28 +105,30 @@ st.markdown(
 st.markdown("""
 **The multiple-testing problem**
 
-Run enough calendar pattern tests and some will look "significant" by chance even
-when the data is pure noise. With 20 tests at α = 0.05, you expect one false
-positive just from randomness. The standard correction — Benjamini-Hochberg FDR —
-adjusts p-values upward based on how many things were tested simultaneously.
-This page applies that correction across all 20 hypotheses in a single pass.
+Testing enough calendar hypotheses guarantees that some will appear statistically
+significant purely by chance. With 20 tests at α = 0.05, one false positive is
+expected under the null hypothesis of no effect. The Benjamini-Hochberg
+false-discovery-rate correction adjusts p-values upward to account for the number
+of simultaneous tests. This page applies that correction across all 20 hypotheses
+in a single pass.
 
-One caveat: the ~20 test count still understates the true data-mining burden.
-The window definitions themselves — "±3 days" around the new moon, "last trading
-day plus first three" for the turn of month — are analyst choices made after
-reading the literature. Each such choice adds hidden degrees of freedom that the
-formal correction cannot account for.
+One important caveat: the stated test count still understates the true
+data-mining burden. The window definitions — for example, ±3 trading days around
+the new moon, or the last trading day of a month plus the first three of the next —
+reflect choices made after reviewing the academic literature. Each such design
+decision introduces hidden degrees of freedom that formal multiple-testing
+corrections cannot account for.
 """)
 
 # ── Summary banner ────────────────────────────────────────────────────────────
 
 st.info(
-    f"**Tested {n_total} calendar patterns.** "
-    f"**{n_raw_sig}** looked significant at raw p < 0.05.  "
-    f"**{n_fdr_sig}** survived multiple-testing correction (BH FDR q = 0.05).  "
-    f"**{n_real}** also held out-of-sample with at least half the in-sample effect.  "
-    f"Of those, **{n_tradable}** had positive mean return after transaction costs.  "
-    f"Baseline green-day rate across all days: **{baseline_green*100:.1f}%**."
+    f"**{n_total} calendar patterns tested.** "
+    f"**{n_raw_sig}** appeared significant at the raw p < 0.05 threshold.  "
+    f"**{n_fdr_sig}** survived the Benjamini-Hochberg multiple-testing correction (FDR q = 0.05).  "
+    f"**{n_real}** also replicated out-of-sample with at least half the in-sample effect size.  "
+    f"Of those, **{n_tradable}** showed a positive mean return after transaction costs.  "
+    f"Baseline positive-return rate across all trading days: **{baseline_green*100:.1f}%**."
 )
 
 # ── Rendering helpers ─────────────────────────────────────────────────────────
@@ -260,19 +262,22 @@ for cat in categories:
                 hide_index=True,
             )
         st.caption(
-            "Gap (pp) = green-day rate on signal days minus other days, in percentage points. "
-            "IS/OOS split at the sample midpoint by observation count. "
-            "Post-cost assumes one round-trip per contiguous signal-day block at "
-            f"{cost_bps} bps one-way. "
-            "Verdict requires FDR p < 0.05 AND OOS gap same sign as IS AND |OOS| ≥ 0.5×|IS|. "
-            "Tradable? is independent: post-cost mean return > 0."
+            "Gap (pp): positive-return rate on signal days minus all other days, "
+            "expressed in percentage points. "
+            "The IS/OOS split is at the sample midpoint by observation count. "
+            f"Post-cost return assumes one round-trip at {cost_bps} bps one-way "
+            "per contiguous signal-day block. "
+            "A verdict of 'Real pattern' requires FDR p < 0.05, out-of-sample gap "
+            "in the same direction as the in-sample gap, and |OOS| ≥ 0.5 × |IS|. "
+            "The 'Tradable?' flag is assessed independently: post-cost mean return > 0."
         )
 
 # ── Disclaimer ────────────────────────────────────────────────────────────────
 
 st.markdown(
-    "_This tool is a skepticism aid, not a signal generator. "
-    "Finding zero actionable anomalies is the correct, expected result for most "
-    "well-studied assets. Past calendar patterns that survived data-mining in "
-    "academic papers have largely disappeared after publication._"
+    "_This tool is designed as a skepticism aid, not a signal generator. "
+    "For most well-studied assets, zero patterns surviving all three criteria "
+    "is the statistically correct and expected outcome. "
+    "Calendar effects that appeared significant in the academic literature have "
+    "largely attenuated or disappeared following publication._"
 )

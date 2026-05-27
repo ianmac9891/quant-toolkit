@@ -132,9 +132,10 @@ if needs_fetch:
     n = n_requested
     est_minutes = max(1, round(n * 0.25 / 60, 1))
     st.info(
-        f"First scan: downloading prices for {n} tickers one-by-one via the "
-        f"parquet cache (~{est_minutes} min). Re-runs in this session are instant; "
-        "re-runs in a new session read from local cache and take ~10 s."
+        f"Downloading and caching price data for {n} tickers "
+        f"(approximately {est_minutes} min on first run). "
+        "Subsequent runs within this session complete instantly. "
+        "New sessions read from the local parquet cache in approximately 10 seconds."
     )
 
     prog = st.progress(0.0, text=f"Fetching prices: 0 / {n}")
@@ -173,13 +174,14 @@ else:
     dl_failed = st.session_state["_dl_failed"]
 
 if price_df.empty:
-    st.error("No price data returned. Check tickers and date range.")
+    st.error("No price data was returned. Verify the tickers and date range.")
     st.stop()
 
 if len(price_df) < 252:
     st.warning(
-        f"Only {len(price_df)} trading days in the selected range — "
-        "need ≥ 252 for all signals. Extend the start date."
+        f"The selected date range contains only {len(price_df)} trading days. "
+        "A minimum of 252 is required to compute all signals. "
+        "Extend the start date to proceed."
     )
     st.stop()
 
@@ -346,9 +348,13 @@ if not ranked.empty:
         apply_chart_theme(scatter_fig)
         st.plotly_chart(scatter_fig, use_container_width=True)
         st.caption(
-            "Color and size encode composite score (brighter / larger = higher rank). "
-            "Top-right combines strong trailing momentum with a smooth, persistent trend. "
-            "Hover to see extension σ — names far above their trendline may be stretched entries."
+            "Color intensity and marker size both encode the composite score — "
+            "brighter and larger markers rank higher. "
+            "The upper-right quadrant combines strong trailing momentum with a "
+            "smooth, persistent trend. "
+            "The extension σ shown on hover indicates how many standard deviations "
+            "the current price sits above the stock's own 252-day trendline; "
+            "names with high extension values may represent stretched entry points."
         )
 
 # ── Expanders for excluded tickers ────────────────────────────────────────────
@@ -358,8 +364,9 @@ if not insufficient.empty:
         f"Insufficient price history — {len(insufficient)} ticker{'s' if len(insufficient) != 1 else ''}"
     ):
         st.info(
-            "These tickers returned price data but had fewer than 80% of the required "
-            "252 trading days in the selected date range (recent IPOs, etc.)."
+            "These tickers had fewer than 80% of the required 252 trading days of "
+            "price data in the selected window. Common causes include recent IPOs, "
+            "spinoffs, and exchange migrations."
         )
         st.dataframe(
             pd.DataFrame({"ticker": insufficient.index}).reset_index(drop=True),
@@ -371,11 +378,12 @@ if not suspect.empty:
         f"Suspect data — {len(suspect)} ticker{'s' if len(suspect) != 1 else ''}"
     ):
         st.warning(
-            "These tickers had non-physical signal values (12-1 momentum > 500% or "
-            "6-month momentum > 300%), almost certainly caused by spinoff stub prices, "
-            "unadjusted splits, or a reused ticker symbol. They were excluded before "
-            "z-scoring so they don't inflate the cross-sectional standard deviation and "
-            "distort every other stock's composite score."
+            "These tickers produced non-physical signal values "
+            "(12-1 momentum above 500% or 6-month momentum above 300%). "
+            "Such values almost certainly reflect spinoff stub prices, "
+            "unadjusted corporate actions, or a reused ticker symbol rather than "
+            "genuine returns. They were excluded before cross-sectional z-scoring "
+            "to prevent distortion of the composite scores for the rest of the universe."
         )
         disp_suspect = suspect[["mom_12_1", "mom_6m"]].copy()
         disp_suspect["mom_12_1"] = disp_suspect["mom_12_1"] * 100
@@ -396,8 +404,9 @@ if dl_failed:
         f"Download failed — {len(dl_failed)} ticker{'s' if len(dl_failed) != 1 else ''}"
     ):
         st.warning(
-            "These tickers returned no data after 3 retries. "
-            "They may be delisted, use a different symbol, or had persistent network errors."
+            "These tickers returned no price data after three download attempts. "
+            "Possible causes include delisting, ticker symbol changes, "
+            "or data source unavailability."
         )
         st.dataframe(
             pd.DataFrame({"ticker": sorted(dl_failed)}).reset_index(drop=True),
@@ -407,7 +416,8 @@ if dl_failed:
 # ── Disclaimer ────────────────────────────────────────────────────────────────
 
 st.markdown(
-    "_This screener ranks stocks by characteristics historically associated with "
-    "medium-term trend continuation. It is a research funnel, not a buy list — "
-    "past trend does not guarantee future returns._"
+    "_This screener ranks equities by characteristics historically associated with "
+    "medium-term trend continuation. It is a quantitative research funnel, not an "
+    "investment recommendation. Rankings reflect statistical patterns in historical "
+    "price data; past trends do not guarantee future results._"
 )
