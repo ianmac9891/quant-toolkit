@@ -8,8 +8,7 @@ textColor = "#E5E7EB"
 font = "monospace"
 
 [server]
-# Don't open browser automatically; we do it ourselves
-headless = false
+headless = true
 
 [browser]
 gatherUsageStats = false
