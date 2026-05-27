@@ -13,7 +13,6 @@ from src import estimators as est
 from src import portfolio as pf
 from src.theme import PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, apply_chart_theme
 
-st.set_page_config(page_title="Portfolio Optimizer", layout="wide")
 
 METHOD_LABELS = {
     "max_sharpe":   "Max Sharpe",

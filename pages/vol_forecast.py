@@ -16,7 +16,6 @@ from src.theme import (
     apply_chart_theme,
 )
 
-st.set_page_config(page_title="Vol Forecast", layout="wide")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ from scipy import stats as scstats
 from src import analysis, data
 from src.theme import PRIMARY, BENCHMARK, apply_chart_theme
 
-st.set_page_config(page_title="Stock Analysis", layout="wide")
 
 # ---------------------------------------------------------------------------
 # Sidebar inputs

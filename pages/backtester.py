@@ -14,7 +14,6 @@ from src import data
 from src import strategies
 from src.theme import PRIMARY, BENCHMARK, POSITIVE, NEUTRAL, PRIMARY_10, apply_chart_theme
 
-st.set_page_config(page_title="Backtester", layout="wide")
 
 STRATEGY_LABELS = {
     "buy_and_hold": "Buy and Hold (equal weight)",

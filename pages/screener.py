@@ -12,7 +12,6 @@ import streamlit as st
 from src import screener as sc
 from src.theme import NEUTRAL, apply_chart_theme
 
-st.set_page_config(page_title="Screener", layout="wide")
 
 # ── Sidebar: universe ─────────────────────────────────────────────────────────
 

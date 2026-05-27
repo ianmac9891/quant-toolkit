@@ -15,7 +15,6 @@ from src.theme import (
     apply_chart_theme,
 )
 
-st.set_page_config(page_title="Risk Model", layout="wide")
 
 st.title("Risk Model")
 

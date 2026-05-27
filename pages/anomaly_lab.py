@@ -14,7 +14,6 @@ from src import anomalies as an
 from src import data as dt
 from src.theme import PRIMARY, BENCHMARK, NEUTRAL, apply_chart_theme
 
-st.set_page_config(page_title="Anomaly Lab", layout="wide")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
