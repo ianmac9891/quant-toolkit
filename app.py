@@ -17,8 +17,10 @@ pg = st.navigation(
             st.Page("home.py", title="Home", icon=":material/home:"),
         ],
         "Analysis": [
-            st.Page("pages/stock_analysis.py",  title="Stock Analysis", icon=":material/show_chart:"),
-            st.Page("pages/vol_forecast.py",    title="Vol Forecast",   icon=":material/trending_up:"),
+            st.Page("pages/stock_analysis.py",  title="Stock Analysis",       icon=":material/show_chart:"),
+            st.Page("pages/vol_forecast.py",    title="Vol Forecast",         icon=":material/trending_up:"),
+            st.Page("pages/event_study.py",     title="Event Study",          icon=":material/query_stats:"),
+            st.Page("pages/options_planner.py", title="Options Trade Planner", icon=":material/candlestick_chart:"),
         ],
         "Portfolio": [
             st.Page("pages/portfolio_optimizer.py", title="Portfolio Optimizer", icon=":material/tune:"),

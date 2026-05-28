@@ -10,10 +10,10 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("**Analysis**")
     st.write(
-        "Single-security price history, return distribution, risk metrics, "
-        "and GARCH(1,1) volatility forecasting with bootstrap simulation."
+        "Single-equity work: characterise a stock's risk profile, forecast its volatility, "
+        "measure how it reacts to events, and plan options trades."
     )
-    st.markdown("Stock Analysis  \nVol Forecast")
+    st.markdown("Stock Analysis  \nVol Forecast  \nEvent Study  \nOptions Trade Planner")
 
 with col2:
     st.markdown("**Portfolio**")
@@ -37,9 +37,27 @@ st.markdown(
     "**Data:** Yahoo Finance (primary, no API key required) · "
     "Alpha Vantage (fundamentals fallback, 25 requests/day free tier)."
 )
-st.markdown(
-    "_This tool is provided for educational and personal research purposes only. "
-    "Nothing on this platform constitutes investment advice, a solicitation, or a "
-    "recommendation to buy or sell any security. All analysis is based on historical "
-    "data; past performance does not guarantee future results._"
+
+st.markdown("---")
+
+st.markdown("**Disclaimer**")
+st.caption(
+    "This application is provided for educational and personal research purposes only. "
+    "The author is not a licensed financial advisor, registered investment advisor, "
+    "broker-dealer, or financial planner in any jurisdiction. Nothing on this platform "
+    "constitutes investment advice, a solicitation, an offer to buy or sell any security, "
+    "or a recommendation of any specific investment strategy.\n\n"
+    "All analysis is based on historical data obtained from third-party providers, which "
+    "may contain errors, omissions, delays, or inaccuracies. Past performance does not "
+    "guarantee future results. All calculations, models, outputs, and visualizations are "
+    "illustrative only and should not be relied upon for any trading, investment, tax, or "
+    "financial decision.\n\n"
+    "The author makes no representations or warranties, express or implied, regarding the "
+    "accuracy, completeness, reliability, or fitness for any particular purpose of any "
+    "information produced by this application. To the fullest extent permitted by "
+    "applicable law, the author disclaims all liability for any direct, indirect, "
+    "incidental, consequential, special, or other losses or damages arising from or "
+    "related to the use of this application or reliance on its outputs.\n\n"
+    "Users should consult a qualified, licensed financial professional before making "
+    "any investment decision."
 )
