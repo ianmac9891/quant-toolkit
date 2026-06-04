@@ -340,12 +340,12 @@ if not ranked.empty:
             xaxis_title="12-1 Momentum (%)",
             yaxis_title="Trend R²",
             yaxis=dict(range=[-0.05, 1.05]),
-            height=520,
+            height=420,
             margin=dict(l=10, r=10, t=10, b=10),
             hovermode="closest",
         )
         apply_chart_theme(scatter_fig)
-        st.plotly_chart(scatter_fig, use_container_width=True)
+        st.plotly_chart(scatter_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
         st.caption(
             "Color intensity and marker size both encode the composite score — "
             "brighter and larger markers rank higher. "

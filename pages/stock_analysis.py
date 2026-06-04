@@ -129,7 +129,7 @@ fig_price.update_layout(
     hovermode="x unified",
 )
 apply_chart_theme(fig_price)
-st.plotly_chart(fig_price, use_container_width=True)
+st.plotly_chart(fig_price, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ---------------------------------------------------------------------------
 # Cumulative return + drawdown
@@ -168,13 +168,13 @@ fig_cum.add_trace(
     row=2, col=1,
 )
 fig_cum.update_layout(
-    height=520, margin=dict(l=10, r=10, t=40, b=10),
+    height=400, margin=dict(l=10, r=10, t=40, b=10),
     hovermode="x unified", showlegend=True,
 )
 fig_cum.update_yaxes(title_text="$ (log)", type="log", row=1, col=1)
 fig_cum.update_yaxes(title_text="%", row=2, col=1)
 apply_chart_theme(fig_cum)
-st.plotly_chart(fig_cum, use_container_width=True)
+st.plotly_chart(fig_cum, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 st.caption(
     f"Max drawdown: **{dd.max_drawdown * 100:,.1f}%**, "
@@ -231,7 +231,7 @@ with col_a:
         yaxis_title="Density",
     )
     apply_chart_theme(fig_hist)
-    st.plotly_chart(fig_hist, use_container_width=True)
+    st.plotly_chart(fig_hist, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 with col_b:
     st.markdown("**Distribution stats**")
@@ -272,11 +272,11 @@ fig_roll.add_trace(go.Scatter(x=rolling_vol.index, y=rolling_vol.values, name="V
                               line=dict(color=PRIMARY, width=1.2)), row=1, col=1)
 fig_roll.add_trace(go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe.values, name="Sharpe",
                               line=dict(color=BENCHMARK, width=1.2)), row=2, col=1)
-fig_roll.update_layout(height=500, margin=dict(l=10, r=10, t=40, b=10),
+fig_roll.update_layout(height=400, margin=dict(l=10, r=10, t=40, b=10),
                        hovermode="x unified", showlegend=False)
 fig_roll.add_hline(y=0, line_dash="dot", line_color="gray", row=2, col=1)
 apply_chart_theme(fig_roll)
-st.plotly_chart(fig_roll, use_container_width=True)
+st.plotly_chart(fig_roll, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ---------------------------------------------------------------------------
 # Raw data expander

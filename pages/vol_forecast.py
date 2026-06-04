@@ -240,13 +240,13 @@ fig.update_layout(
     xaxis_title=None,
     yaxis_title=f"{ticker} price ($)",
     yaxis=dict(range=[y_lo, y_hi]),
-    height=480,
+    height=380,
     margin=dict(l=10, r=10, t=20, b=10),
     legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
     hovermode="x unified",
 )
 apply_chart_theme(fig)
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 st.caption(
     f"Bands show the **50%, 80%, and 95% simulation intervals** driven by {ticker}'s "
     "volatility — not a price prediction. "
@@ -358,7 +358,7 @@ with st.expander("Model details"):
         showlegend=False,
     )
     apply_chart_theme(vol_fig)
-    st.plotly_chart(vol_fig, use_container_width=True)
+    st.plotly_chart(vol_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
     st.caption(
         "The GARCH(1,1) analytic variance forecast mean-reverts toward the long-run level "

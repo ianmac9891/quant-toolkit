@@ -160,9 +160,9 @@ apply_chart_theme(comp_rc)
 
 col_comp1, col_comp2 = st.columns(2)
 with col_comp1:
-    st.plotly_chart(comp_bar, use_container_width=True)
+    st.plotly_chart(comp_bar, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 with col_comp2:
-    st.plotly_chart(comp_rc, use_container_width=True)
+    st.plotly_chart(comp_rc, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 if "risk_parity" in method_used:
     st.info(
@@ -215,7 +215,7 @@ hist_fig.update_layout(
     showlegend=False,
 )
 apply_chart_theme(hist_fig)
-st.plotly_chart(hist_fig, use_container_width=True)
+st.plotly_chart(hist_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ─── Monte Carlo ──────────────────────────────────────────────────────────────
 
@@ -278,13 +278,13 @@ mc_fig.add_trace(go.Scatter(
 mc_fig.update_layout(
     xaxis_title="Trading day",
     yaxis_title="Wealth ($1 invested)",
-    height=440,
+    height=360,
     margin=dict(l=10, r=10, t=10, b=10),
     hovermode="x unified",
     legend=dict(x=0.02, y=0.98),
 )
 apply_chart_theme(mc_fig)
-st.plotly_chart(mc_fig, use_container_width=True)
+st.plotly_chart(mc_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 st.caption(
     "Simulation assumes returns are independent and identically distributed. "
     "Actual equity returns exhibit volatility clustering and heavier tails; "
@@ -317,7 +317,7 @@ tw_fig.update_layout(
     showlegend=False,
 )
 apply_chart_theme(tw_fig)
-st.plotly_chart(tw_fig, use_container_width=True)
+st.plotly_chart(tw_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ─── Factor exposure ──────────────────────────────────────────────────────────
 
@@ -404,7 +404,7 @@ else:
                 "at the 5% level."
             )
         with col_beta:
-            st.plotly_chart(beta_fig, use_container_width=True)
+            st.plotly_chart(beta_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
     except Exception as exc:
         st.error(f"Factor regression failed: {exc}")
@@ -457,4 +457,4 @@ else:
         margin=dict(l=10, r=10, t=40, b=10),
     )
     apply_chart_theme(stress_fig)
-    st.plotly_chart(stress_fig, use_container_width=True)
+    st.plotly_chart(stress_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})

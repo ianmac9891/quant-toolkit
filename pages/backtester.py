@@ -282,13 +282,13 @@ if spy_series is not None:
 eq_fig.update_layout(
     yaxis_type="log",
     yaxis_title="Portfolio value (log scale, indexed to 100)",
-    height=440,
+    height=360,
     margin=dict(l=10, r=10, t=10, b=10),
     hovermode="x unified",
     legend=dict(x=0.02, y=0.98),
 )
 apply_chart_theme(eq_fig)
-st.plotly_chart(eq_fig, use_container_width=True)
+st.plotly_chart(eq_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 st.caption(
     "The shaded region marks the burn-in period during which the strategy is "
     "warming up; it is excluded from in-sample performance metrics. "
@@ -343,7 +343,7 @@ dd_fig.update_layout(
     legend=dict(x=0.02, y=0.05),
 )
 apply_chart_theme(dd_fig)
-st.plotly_chart(dd_fig, use_container_width=True)
+st.plotly_chart(dd_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ── Section 3: IS / OOS performance table ────────────────────────────────────
 
@@ -435,4 +435,4 @@ with st.expander("Weight history"):
             margin=dict(l=10, r=10, t=40, b=10),
         )
         apply_chart_theme(wh_fig)
-        st.plotly_chart(wh_fig, use_container_width=True)
+        st.plotly_chart(wh_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})

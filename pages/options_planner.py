@@ -236,7 +236,7 @@ fig_pnl.update_layout(
     hovermode="x unified",
 )
 apply_chart_theme(fig_pnl)
-st.plotly_chart(fig_pnl, use_container_width=True)
+st.plotly_chart(fig_pnl, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ── Key metrics ───────────────────────────────────────────────────────────────
 

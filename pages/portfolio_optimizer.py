@@ -171,7 +171,7 @@ col_stats, col_corr = st.columns([1, 2])
 with col_stats:
     st.dataframe(stats_df, use_container_width=True)
 with col_corr:
-    st.plotly_chart(corr_fig, use_container_width=True)
+    st.plotly_chart(corr_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ─── Optimization ─────────────────────────────────────────────────────────────
 
@@ -306,9 +306,9 @@ apply_chart_theme(rc_fig)
 
 col_bar, col_rc = st.columns(2)
 with col_bar:
-    st.plotly_chart(bar_fig, use_container_width=True)
+    st.plotly_chart(bar_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 with col_rc:
-    st.plotly_chart(rc_fig, use_container_width=True)
+    st.plotly_chart(rc_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ─── Section 3: Efficient frontier ────────────────────────────────────────────
 
@@ -381,13 +381,13 @@ ef_fig.add_trace(go.Scatter(
 ef_fig.update_layout(
     xaxis_title="Annualized volatility (%)",
     yaxis_title="Annualized return (%)",
-    height=520,
+    height=420,
     margin=dict(l=10, r=10, t=10, b=10),
     hovermode="closest",
     legend=dict(x=0.02, y=0.98),
 )
 apply_chart_theme(ef_fig)
-st.plotly_chart(ef_fig, use_container_width=True)
+st.plotly_chart(ef_fig, use_container_width=True, config={"responsive": True, "displayModeBar": False})
 
 # ─── Section 4: Weights detail ────────────────────────────────────────────────
 

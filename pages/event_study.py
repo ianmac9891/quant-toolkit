@@ -227,13 +227,13 @@ if multi_mode and len(event_dates) > 1:
 
     st.plotly_chart(
         _ar_bar_chart(result.event_times, result.mean_ar, "Mean abnormal return by event day"),
-        use_container_width=True,
+        use_container_width=True, config={"responsive": True, "displayModeBar": False},
     )
     # Use average sigma_e for CI
     avg_sigma = float(np.mean([e.fit.sigma_e for e in result.per_event]))
     st.plotly_chart(
         _car_line_chart(result.event_times, result.mean_car, avg_sigma, "Mean cumulative abnormal return"),
-        use_container_width=True,
+        use_container_width=True, config={"responsive": True, "displayModeBar": False},
     )
 
     st.subheader("Per-event detail")
@@ -286,18 +286,18 @@ else:
     with col_a:
         st.plotly_chart(
             _ar_bar_chart(result.event_times, result.ar, "Abnormal return by event day"),
-            use_container_width=True,
+            use_container_width=True, config={"responsive": True, "displayModeBar": False},
         )
     with col_b:
         st.plotly_chart(
             _car_line_chart(result.event_times, result.car, fit.sigma_e,
                             "Cumulative abnormal return with 95% CI"),
-            use_container_width=True,
+            use_container_width=True, config={"responsive": True, "displayModeBar": False},
         )
 
     st.plotly_chart(
         _actual_vs_predicted_chart(result.event_times, result.actual_return, result.predicted_return),
-        use_container_width=True,
+        use_container_width=True, config={"responsive": True, "displayModeBar": False},
     )
 
 # ── Caveats ───────────────────────────────────────────────────────────────────

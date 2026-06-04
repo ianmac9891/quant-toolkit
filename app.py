@@ -143,11 +143,23 @@ st.markdown(
         .stApp, .main { overflow-x: hidden !important; }
     }
 
-    /* ── Slightly larger tap targets on all touch screens ── */
+    /* ── Plotly modebar: hide on touch screens (toolbar unusable on mobile) ── */
     @media (hover: none) {
+        .modebar-container { display: none !important; }
         .stSlider [role="slider"] {
             width:  28px !important;
             height: 28px !important;
+        }
+    }
+
+    /* ── Plotly axis tick labels: keep readable on narrow screens ── */
+    @media (max-width: 767px) {
+        .xtick text, .ytick text {
+            font-size: 11px !important;
+        }
+        /* Let chart containers scroll horizontally rather than overflow */
+        .stPlotlyChart > div {
+            overflow-x: auto !important;
         }
     }
     </style>

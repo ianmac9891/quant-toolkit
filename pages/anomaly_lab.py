@@ -246,7 +246,7 @@ for cat in categories:
 
     st.plotly_chart(
         _green_rate_chart(cat.bucket_stats, signal_labels, baseline_green),
-        use_container_width=True,
+        use_container_width=True, config={"responsive": True, "displayModeBar": False},
     )
 
     with st.expander("Detailed statistics"):
