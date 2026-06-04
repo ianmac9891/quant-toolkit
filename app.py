@@ -20,6 +20,8 @@ st.markdown(
         if (!head) { setTimeout(injectPWA, 40); return; }
         if (head.querySelector('meta[name="apple-mobile-web-app-capable"]')) return;
 
+        var APP_NAME = 'Quant Toolkit';
+
         function meta(name, content) {
             var m = document.createElement('meta');
             m.name = name; m.content = content;
@@ -33,9 +35,9 @@ st.markdown(
         }
 
         // iOS standalone mode
-        meta('apple-mobile-web-app-capable',       'yes');
+        meta('apple-mobile-web-app-capable',          'yes');
         meta('apple-mobile-web-app-status-bar-style', 'black');
-        meta('apple-mobile-web-app-title',         'Quant Toolkit');
+        meta('apple-mobile-web-app-title',            APP_NAME);
 
         // Android / Chrome theme
         meta('mobile-web-app-capable', 'yes');
@@ -50,6 +52,19 @@ st.markdown(
         // Viewport: viewport-fit=cover fills the notch area on modern iPhones
         var vp = head.querySelector('meta[name="viewport"]');
         if (vp) vp.content = 'width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover';
+
+        // ── Force and hold the document title ──────────────────────────────
+        // Streamlit's base HTML is hard-coded as <title>Streamlit</title>.
+        // iOS reads document.title at the moment the user taps Share, so we
+        // set it here and use a MutationObserver to re-apply it whenever
+        // Streamlit's React runtime tries to change it back.
+        document.title = APP_NAME;
+        var titleEl = document.querySelector('title');
+        if (titleEl) {
+            new MutationObserver(function() {
+                if (document.title !== APP_NAME) document.title = APP_NAME;
+            }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
     })();
     </script>
     """,
