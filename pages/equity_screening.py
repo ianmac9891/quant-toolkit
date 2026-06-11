@@ -312,7 +312,7 @@ if not ranked.empty:
                     colorscale="Plasma",
                     cmin=c_min, cmax=c_max,
                     colorbar=dict(title="Composite", thickness=14),
-                    line=dict(width=0.5, color="rgba(229,231,235,0.5)"),
+                    line=dict(width=0.5, color="rgba(237,234,227,0.5)"),
                 ),
             ))
 
@@ -322,8 +322,8 @@ if not ranked.empty:
             scatter_fig.add_annotation(
                 x=0.97, y=0.97, xref="paper", yref="paper",
                 text="Strong, persistent uptrend", showarrow=False,
-                font=dict(size=11, color="rgba(229,231,235,0.8)"),
-                bgcolor="rgba(20,20,30,0.7)", borderpad=4,
+                font=dict(size=11, color="rgba(237,234,227,0.8)"),
+                bgcolor="rgba(27,26,24,0.75)", borderpad=4,
             )
             scatter_fig.update_layout(
                 xaxis_title="12-1 momentum (%)", yaxis_title="Trend R²",

@@ -11,7 +11,10 @@ from scipy import stats as scstats
 
 import ui
 from src import analysis, data
-from src.theme import PRIMARY, BENCHMARK, PRIMARY_10, CHART_CONFIG, apply_chart_theme
+from src.theme import (
+    PRIMARY, BENCHMARK, PRIMARY_10, REFLINE, SURFACE, HEAT_NEG, HEAT_POS,
+    CHART_CONFIG, apply_chart_theme,
+)
 
 ui.page_header(
     "Equity Research", "Security Analytics",
@@ -223,8 +226,8 @@ if len(monthly) >= 6:
             x=month_names + ["Year"],
             y=[str(y) for y in grid.index],
             zmin=-zmax, zmax=zmax,
-            colorscale=[[0.0, "#7f1d1d"], [0.45, "#11141B"],
-                        [0.55, "#11141B"], [1.0, "#14532d"]],
+            colorscale=[[0.0, HEAT_NEG], [0.45, SURFACE],
+                        [0.55, SURFACE], [1.0, HEAT_POS]],
             text=np.where(np.isnan(z), "", np.vectorize(lambda v: f"{v:+.1f}")(np.nan_to_num(z))),
             texttemplate="%{text}",
             textfont=dict(size=10),
@@ -318,7 +321,7 @@ with ui.panel("Rolling 60-Day Statistics"):
                                   line=dict(color=BENCHMARK, width=1.2)), row=2, col=1)
     fig_roll.update_layout(height=400, margin=dict(l=10, r=10, t=40, b=10),
                            hovermode="x unified", showlegend=False)
-    fig_roll.add_hline(y=0, line_dash="dot", line_color="gray", row=2, col=1)
+    fig_roll.add_hline(y=0, line_dash="dot", line_color=REFLINE, row=2, col=1)
     apply_chart_theme(fig_roll)
     st.plotly_chart(fig_roll, width="stretch", config=CHART_CONFIG)
 

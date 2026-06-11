@@ -12,7 +12,7 @@ from plotly.subplots import make_subplots
 import ui
 from src import analysis, data, portfolio as pf, risk
 from src.theme import (
-    PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL,
+    PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, REFLINE,
     PRIMARY_10, PRIMARY_18, CHART_CONFIG, apply_chart_theme,
 )
 
@@ -397,7 +397,7 @@ with ui.panel("Terminal Wealth Distribution"):
     ))
     tw_fig.add_vline(x=p5[-1], line_color=NEGATIVE, line_dash="dash",
                      annotation_text=f"5th pctl: {p5[-1]:.2f}x")
-    tw_fig.add_vline(x=1.0, line_color="gray", line_dash="dot",
+    tw_fig.add_vline(x=1.0, line_color=REFLINE, line_dash="dot",
                      annotation_text="Break even")
     tw_fig.update_layout(
         xaxis_title="Terminal wealth (multiple of initial)",
@@ -464,7 +464,7 @@ else:
                 error_x=dict(type="data", array=[1.96 * se[f] for f in factors], visible=True),
                 marker_color=beta_colors,
             ))
-            beta_fig.add_vline(x=0, line_color="gray", line_dash="dot")
+            beta_fig.add_vline(x=0, line_color=REFLINE, line_dash="dot")
             beta_fig.update_layout(
                 title="Factor loadings (±1.96 SE)", height=260,
                 margin=dict(l=10, r=10, t=40, b=10),
@@ -524,7 +524,7 @@ else:
             go.Bar(name="Portfolio",    x=windows, y=port_ret, marker_color=PRIMARY),
             go.Bar(name="Equal weight", x=windows, y=eq_ret,   marker_color=NEUTRAL),
         ])
-        stress_fig.add_hline(y=0, line_color="gray", line_dash="dot")
+        stress_fig.add_hline(y=0, line_color=REFLINE, line_dash="dot")
         stress_fig.update_layout(
             barmode="group", title="Cumulative return through each stress window",
             yaxis_title="Return (%)", height=340, margin=dict(l=10, r=10, t=40, b=10),

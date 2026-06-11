@@ -11,7 +11,7 @@ import ui
 from src import data
 from src import pairs as pr
 from src.theme import (
-    PRIMARY, BENCHMARK, NEGATIVE, NEUTRAL, REFLINE,
+    PRIMARY, BENCHMARK, NEGATIVE, NEUTRAL, REFLINE, TEXT,
     PRIMARY_18, NEGATIVE_18, CHART_CONFIG, apply_chart_theme,
 )
 
@@ -150,7 +150,7 @@ with ui.panel(f"Spread Z-Score — log({res.ticker_a}) − {res.hedge_ratio:.3f}
 
     sp_fig.add_trace(go.Scatter(
         x=z.index, y=z.values, mode="lines",
-        name="Spread z-score", line=dict(color="#E5E7EB", width=1.3),
+        name="Spread z-score", line=dict(color=TEXT, width=1.3),
     ))
     sp_fig.add_hline(y=0, line_color=REFLINE, line_width=1)
     for lvl in (entry_z, -entry_z):

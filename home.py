@@ -6,13 +6,14 @@ import ui
 
 st.markdown(
     f"""
-    <div style="margin: 0.5rem 0 0.4rem 0;
-                font-family: var(--font-mono); font-size: 13px; font-weight: 600;
-                letter-spacing: 0.16em; color: var(--accent);">{ui.APP_WORDMARK}</div>
-    <div style="font-size: 30px; font-weight: 650; letter-spacing: -0.015em;
-                color: var(--text); margin-bottom: 0.35rem;">{ui.APP_NAME}</div>
-    <div style="font-size: 13.5px; color: var(--text-muted); max-width: 720px;
-                line-height: 1.55; margin-bottom: 2rem;">
+    <div style="margin: 0.6rem 0 0.5rem 0;
+                font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+                letter-spacing: 0.18em; color: var(--accent);">{ui.APP_WORDMARK}</div>
+    <div style="font-family: var(--font-display); font-size: 44px; font-weight: 550;
+                letter-spacing: 0; line-height: 1.1;
+                color: var(--text); margin-bottom: 0.6rem;">{ui.APP_NAME}</div>
+    <div style="font-size: 15px; color: var(--text-muted); max-width: 760px;
+                line-height: 1.6; margin-bottom: 2.4rem;">
         Institutional-style analytics for equity research, portfolio construction,
         risk measurement, and systematic strategy validation. All analytics operate
         on daily historical market data; nothing on this platform is investment advice.

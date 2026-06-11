@@ -130,7 +130,9 @@ The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit ap
 **`src/correlation.py`** (Correlation Analytics): `correlation_matrix`, `mean_offdiag_correlation`, `rolling_mean_correlation(returns, window)` (average pairwise correlation per date — the diversification pulse), `rolling_pair_correlation`, `pc1_variance_share` (top eigenvalue share of the correlation matrix), `diversification_ratio` (Choueifaty-Coignard), `extreme_pairs`.
 
 **`src/theme.py`** is the single source of truth for design tokens and chart styling (pure Python, no Streamlit):
-- Surfaces (`CANVAS`, `SURFACE`, `BORDER`, …), text (`TEXT`, `TEXT_MUTED`, …), semantic series palette (`PRIMARY`, `BENCHMARK`, `POSITIVE`, `NEGATIVE`, `NEUTRAL`), opacity variants (`PRIMARY_10/18/28/80`), fonts (`FONT_UI` Inter, `FONT_MONO` IBM Plex Mono)
+- The visual identity is **warm graphite + amber**: surfaces (`CANVAS`, `SURFACE`, `BORDER`, …) carry no blue cast, `PRIMARY` is amber (also the UI accent), `BENCHMARK` is muted steel blue, `POSITIVE`/`NEGATIVE` are muted green/red, `HEAT_NEG`/`HEAT_POS` are the diverging-heatmap endpoints. Opacity variants: `PRIMARY_10/18/28/80`
+- Fonts: `FONT_DISPLAY` (Newsreader serif — page titles, masthead, card titles), `FONT_UI` (Inter — body, labels), `FONT_MONO` (IBM Plex Mono — numerals only). Never put body text or input copy in mono
+- Never hardcode a hex color in a page — import the token. Banner semantics: info = steel, warn = amber, error = red, success = green
 - `apply_chart_theme(fig)` — transparent surfaces, hairline grid, mono tick labels; uses `update_xaxes`/`update_yaxes` so it works on multi-subplot figures. It only styles `title_font` when a title exists — Plotly 6 renders the literal string "undefined" otherwise
 - `CHART_CONFIG` — the standard `st.plotly_chart` config dict; use it on every chart
 

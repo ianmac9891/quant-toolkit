@@ -11,7 +11,7 @@ import ui
 from src import data as dt
 from src import volforecast as vf
 from src.theme import (
-    PRIMARY, BENCHMARK, NEUTRAL, NEGATIVE, POSITIVE,
+    PRIMARY, BENCHMARK, NEUTRAL, NEGATIVE, POSITIVE, TEXT,
     PRIMARY_10, PRIMARY_18, PRIMARY_28, PRIMARY_80,
     REFLINE, CHART_CONFIG, apply_chart_theme,
 )
@@ -181,7 +181,7 @@ with ui.panel(f"Simulated Price Distribution — {model_label}, "
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=hist_tail.index, y=hist_tail.values,
-        mode="lines", line=dict(color="#E5E7EB", width=2),
+        mode="lines", line=dict(color=TEXT, width=2),
         name="Price history", showlegend=True,
     ))
 

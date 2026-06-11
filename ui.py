@@ -27,7 +27,7 @@ APP_WORDMARK = "QRT"
 
 _DESIGN_SYSTEM_CSS = f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400..700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {{
     --canvas: {tk.CANVAS};
@@ -42,6 +42,7 @@ _DESIGN_SYSTEM_CSS = f"""
     --benchmark: {tk.BENCHMARK};
     --positive: {tk.POSITIVE};
     --negative: {tk.NEGATIVE};
+    --font-display: {tk.FONT_DISPLAY};
     --font-ui: {tk.FONT_UI};
     --font-mono: {tk.FONT_MONO};
 }}
@@ -49,12 +50,14 @@ _DESIGN_SYSTEM_CSS = f"""
 /* ── Base canvas and typography ── */
 .stApp {{ background: var(--canvas); }}
 html, body, .stApp, .stMarkdown, p, li {{ font-family: var(--font-ui); }}
-.stMarkdown p, .stMarkdown li {{ font-size: 13.5px; line-height: 1.55; color: var(--text); }}
+.stMarkdown p, .stMarkdown li {{ font-size: 14.5px; line-height: 1.6; color: var(--text); }}
 
 .block-container {{
-    max-width: 1180px;
-    padding-top: 1.1rem;
-    padding-bottom: max(3rem, env(safe-area-inset-bottom));
+    max-width: 1240px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 1.5rem;
+    padding-bottom: max(3.5rem, env(safe-area-inset-bottom));
 }}
 
 /* Hide chrome we replace: header decoration, toolbar, sidebar toggle */
@@ -63,40 +66,43 @@ html, body, .stApp, .stMarkdown, p, li {{ font-family: var(--font-ui); }}
 [data-testid="stToolbar"] {{ display: none; }}
 [data-testid="collapsedControl"] {{ display: none; }}
 
-h1, h2, h3 {{ font-family: var(--font-ui); color: var(--text); }}
-h1 {{ font-size: 24px !important; font-weight: 650 !important; letter-spacing: -0.01em; }}
-h2 {{ font-size: 17px !important; font-weight: 600 !important; }}
-h3 {{ font-size: 15px !important; font-weight: 600 !important; }}
+h1, h2, h3 {{ color: var(--text); }}
+h1 {{ font-family: var(--font-display) !important; font-size: 32px !important;
+     font-weight: 550 !important; letter-spacing: 0; }}
+h2 {{ font-family: var(--font-ui); font-size: 20px !important; font-weight: 600 !important; }}
+h3 {{ font-family: var(--font-ui); font-size: 16px !important; font-weight: 600 !important; }}
 
 [data-testid="stCaptionContainer"] p {{
     color: var(--text-faint) !important;
-    font-size: 12px !important;
-    line-height: 1.5;
+    font-size: 12.5px !important;
+    line-height: 1.55;
 }}
 
-hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
+hr {{ border-color: var(--border) !important; margin: 1.6rem 0 !important; }}
 
 /* ── Panels: bordered containers and forms ── */
+[data-testid="stVerticalBlockBorderWrapper"] {{ margin: 0.3rem 0 0.8rem 0; }}
 [data-testid="stVerticalBlockBorderWrapper"] > div:first-child {{
     background: var(--surface);
     border: 1px solid var(--border) !important;
-    border-radius: 6px;
-    padding: 1.05rem 1.2rem;
+    border-radius: 8px;
+    padding: 1.3rem 1.5rem;
 }}
 [data-testid="stForm"] {{
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1.05rem 1.2rem;
+    border-radius: 8px;
+    padding: 1.3rem 1.5rem;
+    margin: 0.3rem 0 0.8rem 0;
 }}
 
-/* ── Inputs ── */
+/* ── Inputs — sans body, mono reserved for numerals elsewhere ── */
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
 [data-testid="stTextArea"] textarea,
 [data-testid="stDateInput"] input {{
-    font-family: var(--font-mono) !important;
-    font-size: 13px !important;
+    font-family: var(--font-ui) !important;
+    font-size: 14px !important;
     background: var(--surface-raised) !important;
     border-color: var(--border) !important;
     color: var(--text) !important;
@@ -104,21 +110,21 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
 [data-testid="stSelectbox"] > div > div {{
     background: var(--surface-raised) !important;
     border-color: var(--border) !important;
-    font-size: 13px;
+    font-size: 14px;
 }}
 .stTextInput label p, .stNumberInput label p, .stTextArea label p,
 .stDateInput label p, .stSelectbox label p, .stSlider label p,
 .stRadio label p, .stCheckbox label p, .stMultiSelect label p {{
-    font-size: 11px !important;
+    font-size: 11.5px !important;
     font-weight: 600 !important;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted) !important;
 }}
 .stRadio [role="radiogroup"] p, .stCheckbox [data-testid="stWidgetLabel"] ~ * p {{
     text-transform: none;
     letter-spacing: 0;
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 400 !important;
     color: var(--text) !important;
 }}
@@ -127,15 +133,15 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
 .stButton > button, [data-testid="stFormSubmitButton"] > button,
 [data-testid="stDownloadButton"] > button {{
     font-family: var(--font-ui) !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 600 !important;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    border-radius: 4px !important;
+    border-radius: 5px !important;
     border: 1px solid var(--border-strong) !important;
     background: var(--surface-raised) !important;
     color: var(--text) !important;
-    min-height: 38px;
+    min-height: 42px;
 }}
 .stButton > button:hover, [data-testid="stFormSubmitButton"] > button:hover,
 [data-testid="stDownloadButton"] > button:hover {{
@@ -146,30 +152,31 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
 .stButton > button[kind="primary"] {{
     background: var(--accent) !important;
     border-color: var(--accent) !important;
-    color: #0A0C10 !important;
+    color: {tk.CANVAS} !important;
 }}
 [data-testid="stFormSubmitButton"] > button[kind="primary"]:hover,
 .stButton > button[kind="primary"]:hover {{
-    filter: brightness(1.12);
+    filter: brightness(1.1);
 }}
 
 /* ── Tables ── */
 [data-testid="stDataFrame"] {{
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
 }}
 
 /* ── Expanders ── */
 [data-testid="stExpander"] {{
     border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
+    border-radius: 8px !important;
     background: var(--surface);
+    margin: 0.3rem 0 0.8rem 0;
 }}
 [data-testid="stExpander"] summary p {{
-    font-size: 11px !important;
+    font-size: 12px !important;
     font-weight: 600 !important;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted) !important;
 }}
@@ -180,75 +187,96 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
     align-items: baseline;
     justify-content: space-between;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 0.65rem;
-    margin-bottom: 1.4rem;
+    padding-bottom: 0.8rem;
+    margin-bottom: 1.8rem;
 }}
 .qrt-topbar a {{
-    font-family: var(--font-mono);
-    font-size: 13px;
+    font-family: var(--font-display);
+    font-size: 16px;
     font-weight: 600;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.05em;
     color: var(--text) !important;
     text-decoration: none !important;
 }}
-.qrt-topbar a span {{ color: var(--accent); }}
+.qrt-topbar a span {{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    vertical-align: 1px;
+}}
 .qrt-topbar a:hover {{ color: var(--accent) !important; }}
 .qrt-topbar .qrt-section {{
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
-    letter-spacing: 0.10em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-faint);
 }}
 
-.qrt-pagetitle {{ margin: 0 0 0.2rem 0; font-size: 24px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); }}
-.qrt-pagedesc  {{ margin: 0 0 1.3rem 0; font-size: 13px; color: var(--text-muted); max-width: 760px; line-height: 1.5; }}
+.qrt-pagetitle {{
+    margin: 0 0 0.35rem 0;
+    font-family: var(--font-display);
+    font-size: 34px;
+    font-weight: 550;
+    letter-spacing: 0;
+    line-height: 1.15;
+    color: var(--text);
+}}
+.qrt-pagedesc {{
+    margin: 0 0 1.7rem 0;
+    font-size: 14.5px;
+    color: var(--text-muted);
+    max-width: 820px;
+    line-height: 1.6;
+}}
 
 .qrt-kicker {{
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin: 0 0 0.55rem 0;
+    margin: 0 0 0.8rem 0;
 }}
 
 .qrt-kpi-row {{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-    gap: 10px;
-    margin: 0.2rem 0 1rem 0;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 12px;
+    margin: 0.3rem 0 1.2rem 0;
 }}
 .qrt-kpi {{
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    padding: 0.95rem 1.1rem;
+    display: flex;
+    flex-direction: column;
 }}
 .qrt-kpi .lbl {{
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 0.3rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.4;
+    margin-bottom: 0.45rem;
 }}
 .qrt-kpi .val {{
     font-family: var(--font-mono);
-    font-size: 21px;
+    font-size: 26px;
     font-weight: 500;
     color: var(--text);
     font-variant-numeric: tabular-nums;
-    line-height: 1.15;
+    line-height: 1.1;
+    margin-top: auto;
 }}
 .qrt-kpi .delta {{
     font-family: var(--font-mono);
-    font-size: 11.5px;
-    margin-top: 0.25rem;
+    font-size: 12px;
+    margin-top: 0.35rem;
     font-variant-numeric: tabular-nums;
 }}
 .qrt-kpi .delta.pos {{ color: var(--positive); }}
@@ -258,16 +286,16 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
 .qrt-banner {{
     border: 1px solid var(--border);
     border-left-width: 3px;
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--surface);
-    padding: 0.7rem 1rem;
-    font-size: 13px;
-    line-height: 1.55;
+    padding: 0.9rem 1.15rem;
+    font-size: 14px;
+    line-height: 1.6;
     color: var(--text);
-    margin: 0.4rem 0 1rem 0;
+    margin: 0.4rem 0 1.2rem 0;
 }}
-.qrt-banner.info    {{ border-left-color: var(--accent); }}
-.qrt-banner.warn    {{ border-left-color: var(--benchmark); }}
+.qrt-banner.info    {{ border-left-color: var(--benchmark); }}
+.qrt-banner.warn    {{ border-left-color: var(--accent); }}
 .qrt-banner.error   {{ border-left-color: var(--negative); }}
 .qrt-banner.success {{ border-left-color: var(--positive); }}
 .qrt-banner b, .qrt-banner strong {{ font-weight: 600; }}
@@ -277,10 +305,11 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
     display: block;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1.05rem 1.15rem;
+    border-radius: 8px;
+    padding: 1.3rem 1.4rem;
+    margin-bottom: 0.85rem;
     text-decoration: none !important;
-    height: 100%;
+    height: calc(100% - 0.85rem);
     transition: border-color 120ms ease, background 120ms ease;
 }}
 .qrt-card:hover {{
@@ -288,55 +317,56 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
     background: var(--surface-raised);
 }}
 .qrt-card .t {{
-    font-size: 15px;
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 550;
     color: var(--text);
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.4rem;
 }}
 .qrt-card .d {{
-    font-size: 12.5px;
+    font-size: 13.5px;
     color: var(--text-muted);
-    line-height: 1.5;
-    margin-bottom: 0.6rem;
+    line-height: 1.6;
+    margin-bottom: 0.8rem;
 }}
 .qrt-card .caps {{
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 11.5px;
     color: var(--text-faint);
-    line-height: 1.7;
+    line-height: 1.85;
 }}
 
 .qrt-footer {{
     border-top: 1px solid var(--border);
-    margin-top: 2.5rem;
-    padding-top: 0.9rem;
-    font-size: 11px;
-    line-height: 1.6;
+    margin-top: 3rem;
+    padding-top: 1.1rem;
+    font-size: 11.5px;
+    line-height: 1.65;
     color: var(--text-faint);
 }}
 
 .qrt-tag {{
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     letter-spacing: 0.05em;
-    padding: 2px 9px;
-    border-radius: 3px;
+    padding: 3px 11px;
+    border-radius: 4px;
     border: 1px solid var(--border-strong);
 }}
 .qrt-tag.pos {{ color: var(--positive); border-color: var(--positive); }}
 .qrt-tag.neg {{ color: var(--negative); border-color: var(--negative); }}
 .qrt-tag.neu {{ color: var(--text-muted); }}
 .qrt-tag.accent {{ color: var(--accent); border-color: var(--accent); }}
-.qrt-tag.warn {{ color: var(--benchmark); border-color: var(--benchmark); }}
+.qrt-tag.warn {{ color: var(--accent); border-color: var(--accent); }}
 
 /* ── Mobile (≤ 767px) ── */
 @media (max-width: 767px) {{
     .block-container {{
-        padding-top: 0.75rem !important;
-        padding-left: 0.85rem !important;
-        padding-right: 0.85rem !important;
+        padding-top: 0.85rem !important;
+        padding-left: 0.9rem !important;
+        padding-right: 0.9rem !important;
     }}
     [data-testid="column"] {{
         width: 100% !important;
@@ -349,7 +379,9 @@ hr {{ border-color: var(--border) !important; margin: 1.2rem 0 !important; }}
     }}
     input, select, textarea {{ font-size: 16px !important; }}
     .stButton > button {{ min-height: 44px !important; }}
-    .qrt-kpi-row {{ grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }}
+    .qrt-pagetitle {{ font-size: 28px; }}
+    .qrt-kpi-row {{ grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }}
+    .qrt-kpi .val {{ font-size: 22px; }}
 }}
 @media (hover: none) {{
     .modebar-container {{ display: none !important; }}
