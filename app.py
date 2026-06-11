@@ -26,6 +26,7 @@ pg = st.navigation(
         st.Page("pages/volatility_analytics.py", title="Volatility Analytics",   url_path="volatility-analytics"),
         st.Page("pages/event_study.py",          title="Event Study",            url_path="event-study"),
         st.Page("pages/derivatives_workbench.py", title="Derivatives Workbench", url_path="derivatives-workbench"),
+        st.Page("pages/options_chain.py",          title="Options Chain Explorer", url_path="options-chain"),
         # Portfolio & Risk
         st.Page("pages/portfolio_construction.py", title="Portfolio Construction", url_path="portfolio-construction"),
         st.Page("pages/risk_analytics.py",          title="Risk Analytics",         url_path="risk-analytics"),

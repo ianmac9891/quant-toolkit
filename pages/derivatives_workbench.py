@@ -12,7 +12,7 @@ from src import options as op
 from src.theme import PRIMARY, BENCHMARK, NEUTRAL, REFLINE, CHART_CONFIG, apply_chart_theme
 
 ui.page_header(
-    "Equity Research", "Derivatives Workbench",
+    "Equity & Derivatives Research", "Derivatives Workbench",
     "Construct and analyze multi-leg option positions under the "
     "Black-Scholes-Merton model: payoff profiles, position Greeks, probability "
     "of profit, and implied volatility. All pricing is theoretical; no live "

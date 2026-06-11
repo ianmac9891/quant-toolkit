@@ -631,6 +631,21 @@ def remember_universe(tickers: list[str]) -> None:
         st.session_state[_UNIVERSE_KEY] = list(tickers)
 
 
+_RISKFREE_KEY = "qrt_riskfree_pct"
+
+
+def get_default_rf_pct(fallback: float = 4.5) -> float:
+    """App-wide risk-free default in percent. The Yield Curve Monitor writes
+    the current 13-week bill rate here; pages with rate inputs read it as
+    their default while remaining user-editable."""
+    return float(st.session_state.get(_RISKFREE_KEY, fallback))
+
+
+def set_default_rf_pct(rate_pct: float) -> None:
+    if rate_pct == rate_pct and 0.0 <= rate_pct <= 25.0:  # NaN-safe sanity bound
+        st.session_state[_RISKFREE_KEY] = float(rate_pct)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Exports
 # ──────────────────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ from src.theme import (
 )
 
 ui.page_header(
-    "Equity Research", "Volatility Analytics",
+    "Equity & Derivatives Research", "Volatility Analytics",
     "Conditional volatility modeling with GARCH(1,1) or GJR-GARCH(1,1,1), "
     "bootstrap-simulated price distributions, and probability estimates for "
     "user-defined reference levels.",

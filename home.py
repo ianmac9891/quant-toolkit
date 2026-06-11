@@ -24,7 +24,7 @@ st.markdown(
 
 # ── Equity Research ───────────────────────────────────────────────────────────
 
-ui.section("Equity Research")
+ui.section("Equity & Derivatives Research")
 c1, c2 = st.columns(2)
 with c1:
     st.html(ui.nav_card(
@@ -54,6 +54,13 @@ with c2:
         "profiles, position Greeks, probability of profit, and implied volatility.",
         ["Payoff profile", "Position Greeks", "Probability of profit",
          "Implied volatility solver"],
+    ))
+    st.html(ui.nav_card(
+        "options-chain", "Options Chain Explorer",
+        "Listed option chains from delayed market data: the implied volatility "
+        "smile and term structure, straddle-implied move, and positioning.",
+        ["IV smile and term structure", "Implied expected move",
+         "Open interest and volume profile", "Quote table with model deltas"],
     ))
 
 # ── Portfolio & Risk ──────────────────────────────────────────────────────────

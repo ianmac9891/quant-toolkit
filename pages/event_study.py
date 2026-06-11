@@ -15,7 +15,7 @@ from src.theme import (
 )
 
 ui.page_header(
-    "Equity Research", "Event Study",
+    "Equity & Derivatives Research", "Event Study",
     "Abnormal returns around announcement dates under the market model "
     "(Brown-Warner OLS), with Patell standardized-residual and BMP "
     "variance-robust test statistics, and cross-sectional aggregation "

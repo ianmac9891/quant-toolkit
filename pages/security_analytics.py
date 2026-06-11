@@ -17,7 +17,7 @@ from src.theme import (
 )
 
 ui.page_header(
-    "Equity Research", "Security Analytics",
+    "Equity & Derivatives Research", "Security Analytics",
     "Total-return profile, drawdown history, return distribution, and rolling "
     "risk statistics for a single instrument, benchmarked against a reference index.",
 )
