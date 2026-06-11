@@ -24,12 +24,14 @@ _PCT = 100.0   # scaling factor: log returns × 100 for GARCH fitting
 
 @dataclass
 class GarchFit:
-    # Parameters — omega in (%/day)^2 units; alpha, beta dimensionless
+    # Parameters — omega in (%/day)^2 units; alpha, beta, gamma dimensionless
     omega: float
     alpha: float
     beta: float
-    persistence: float          # alpha + beta; must be < 1 for stationarity
+    persistence: float          # alpha + beta (+ gamma/2 for GJR); must be < 1
     mu_pct: float               # fitted mean log return (% per day)
+    gamma: float                # GJR asymmetry term; 0 for symmetric GARCH
+    model: str                  # "garch" | "gjr"
 
     # Variance state — all in (%/day)^2
     h_current_pct2: float       # sigma_t^2 at last observation
@@ -73,9 +75,14 @@ class VolForecast:
 
 # ── Fitting ───────────────────────────────────────────────────────────────────
 
-def fit_garch(prices: pd.Series) -> GarchFit:
+def fit_garch(prices: pd.Series, model_type: str = "garch") -> GarchFit:
     """
-    Fit GARCH(1,1) to daily log returns.
+    Fit GARCH(1,1) or GJR-GARCH(1,1,1) to daily log returns.
+
+    model_type "gjr" adds the asymmetry term γ·ε²·I(ε<0), capturing the
+    leverage effect (volatility rises more after negative returns) that is
+    characteristic of equity series. Persistence for GJR is α + β + γ/2
+    (the indicator's expectation is 1/2 under symmetric shocks).
 
     Raises
     ------
@@ -86,9 +93,10 @@ def fit_garch(prices: pd.Series) -> GarchFit:
     log_rets = np.log(prices / prices.shift(1)).dropna()
     rets_pct = log_rets * _PCT
 
+    o = 1 if model_type == "gjr" else 0
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model  = arch_model(rets_pct, vol="Garch", p=1, q=1,
+        model  = arch_model(rets_pct, vol="Garch", p=1, o=o, q=1,
                             dist="Normal", mean="Constant")
         result = model.fit(disp="off", show_warning=False)
 
@@ -96,12 +104,13 @@ def fit_garch(prices: pd.Series) -> GarchFit:
     omega = float(p["omega"])
     alpha = float(p["alpha[1]"])
     beta  = float(p["beta[1]"])
+    gamma = float(p.get("gamma[1]", 0.0))
     mu    = float(p.get("mu", p.get("Const", 0.0)))
-    persistence = alpha + beta
+    persistence = alpha + beta + gamma / 2.0
 
     if persistence >= 1.0:
         raise ValueError(
-            f"Non-stationary GARCH fit: persistence (α+β) = {persistence:.4f} ≥ 1. "
+            f"Non-stationary fit: persistence = {persistence:.4f} ≥ 1. "
             "Try a longer fit window or a different ticker."
         )
 
@@ -110,9 +119,14 @@ def fit_garch(prices: pd.Series) -> GarchFit:
     sigma_t       = float(result.conditional_volatility.iloc[-1])   # % per day
     h_current_pct2 = sigma_t ** 2
 
-    # One-step-ahead variance: omega + alpha * eps_t^2 + beta * h_t
+    # One-step-ahead variance: omega + alpha*eps² (+ gamma*eps²·I(eps<0)) + beta*h
     last_resid    = float(result.resid.iloc[-1])   # in % units
-    h_next_pct2   = omega + alpha * last_resid ** 2 + beta * h_current_pct2
+    h_next_pct2   = (
+        omega
+        + alpha * last_resid ** 2
+        + gamma * last_resid ** 2 * (1.0 if last_resid < 0 else 0.0)
+        + beta * h_current_pct2
+    )
     h_next_pct2   = max(h_next_pct2, 1e-8)         # numerical guard
 
     def _ann(h: float) -> float:
@@ -132,6 +146,7 @@ def fit_garch(prices: pd.Series) -> GarchFit:
 
     return GarchFit(
         omega=omega, alpha=alpha, beta=beta,
+        gamma=gamma, model=model_type,
         persistence=persistence, mu_pct=mu,
         h_current_pct2=h_current_pct2,
         h_next_pct2=h_next_pct2,
@@ -199,9 +214,15 @@ def simulate_paths(
         r_pct = drift_log_pct + np.sqrt(h) * Z[:, t]        # (n_sim,)
         log_prices[:, t + 1] = log_prices[:, t] + r_pct / _PCT
 
-        # GARCH variance update — centered residual = shock component only
+        # Variance update — centered residual = shock component only.
+        # The gamma term (zero for symmetric GARCH) loads only on negative shocks.
         eps_pct = r_pct - drift_log_pct                      # = sqrt(h) * Z[:, t]
-        h = fit.omega + fit.alpha * eps_pct ** 2 + fit.beta * h
+        h = (
+            fit.omega
+            + fit.alpha * eps_pct ** 2
+            + fit.gamma * eps_pct ** 2 * (eps_pct < 0)
+            + fit.beta * h
+        )
 
     price_paths = np.exp(log_prices)   # (n_sim, horizon+1)
 

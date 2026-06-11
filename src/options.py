@@ -207,10 +207,10 @@ def position_pnl(
 def breakevens(
     legs: List[Leg], S0: float, r: float, q: float = 0.0, n_points: int = 2000,
 ) -> List[float]:
-    """Spot prices where P&L = 0 at max-DTE expiration (linear interpolation)."""
-    max_dte = max((l.dte for l in legs if l.option_type != "stock"), default=365)
+    """Spot prices where P&L = 0 at the front expiration (linear interpolation)."""
+    horizon = eval_horizon_dte(legs)
     S_range = np.linspace(S0 * 0.30, S0 * 2.50, n_points)
-    pnl     = position_pnl(legs, S_range, S0, r, q, days_elapsed=max_dte)
+    pnl     = position_pnl(legs, S_range, S0, r, q, days_elapsed=horizon)
 
     bes = []
     for i in range(len(pnl) - 1):
@@ -221,21 +221,100 @@ def breakevens(
     return bes
 
 
+def atm_leg_iv(legs: List[Leg], S0: float) -> float:
+    """IV of the option leg whose strike is nearest the spot — the default
+    proxy for the single underlying volatility used in simulation."""
+    option_legs = [l for l in legs if l.option_type != "stock" and l.iv > 0]
+    if not option_legs:
+        return 0.20
+    nearest = min(option_legs, key=lambda l: abs(l.strike - S0))
+    return float(nearest.iv)
+
+
+def eval_horizon_dte(legs: List[Leg]) -> int:
+    """Evaluation horizon for expiry metrics: the FRONT (earliest) option
+    expiration. Valuing the position past the front expiry would require
+    path-dependent settlement of the expired legs, which a terminal-price
+    model cannot represent."""
+    return min((l.dte for l in legs if l.option_type != "stock"), default=365)
+
+
 def prob_of_profit(
-    legs: List[Leg], S0: float, r: float, q: float = 0.0, n_sims: int = 10_000,
+    legs: List[Leg],
+    S0: float,
+    r: float,
+    q: float = 0.0,
+    n_sims: int = 20_000,
+    underlying_vol: Optional[float] = None,
 ) -> float:
-    """Risk-neutral Monte Carlo POP at position's max DTE."""
-    max_dte = max((l.dte for l in legs if l.option_type != "stock"), default=365)
-    T       = max_dte / 365.0
-    avg_iv  = float(np.mean([l.iv for l in legs if l.option_type not in ("stock",)]) or 0.20)
+    """Risk-neutral Monte Carlo POP at the front expiration.
+
+    The underlying is simulated with a single volatility (the underlying has
+    one diffusion regardless of how many legs reference it). Defaults to the
+    IV of the leg nearest the money; pass underlying_vol to override.
+    """
+    horizon = eval_horizon_dte(legs)
+    T       = horizon / 365.0
+    vol     = float(underlying_vol) if underlying_vol else atm_leg_iv(legs, S0)
 
     rng = np.random.default_rng(42)
     z   = rng.standard_normal(n_sims)
-    log_S = np.log(S0) + (r - q - 0.5 * avg_iv ** 2) * T + avg_iv * np.sqrt(T) * z
+    log_S = np.log(S0) + (r - q - 0.5 * vol ** 2) * T + vol * np.sqrt(T) * z
     S_term = np.exp(log_S)
 
-    pnl = position_pnl(legs, S_term, S0, r, q, days_elapsed=max_dte)
+    pnl = position_pnl(legs, S_term, S0, r, q, days_elapsed=horizon)
     return float((pnl > 0).mean())
+
+
+@dataclass
+class PayoffBounds:
+    max_profit: float          # at the front expiration; +inf if unbounded
+    max_loss: float            # most negative P&L; -inf if unbounded
+    profit_unbounded: bool
+    loss_unbounded: bool
+    upper_slope: float         # dP&L/dS per $1 of spot as S → ∞ (per position)
+
+
+def payoff_bounds(
+    legs: List[Leg], S0: float, r: float, q: float = 0.0,
+) -> PayoffBounds:
+    """Analytic max profit / max loss at the front expiration.
+
+    Unboundedness is determined from the asymptotic payoff slope as S → ∞:
+    each stock leg and each call (any expiry — deep ITM calls converge to
+    forward delta ≈ 1) contributes its signed share count; puts contribute
+    nothing on the upside. The downside is always bounded because the spot
+    is floored at zero. Bounded extremes are then read off a dense terminal
+    grid spanning [≈0, 4×S0] plus every strike.
+    """
+    horizon = eval_horizon_dte(legs)
+
+    upper_slope = 0.0
+    for leg in legs:
+        mult = (1 if leg.direction == "long" else -1) * leg.quantity * CONTRACT_MULTIPLIER
+        if leg.option_type in ("stock", "call"):
+            upper_slope += mult
+
+    strikes = [l.strike for l in legs if l.option_type != "stock"]
+    grid = np.unique(np.concatenate([
+        np.linspace(0.01, max(S0 * 4.0, (max(strikes) if strikes else S0) * 1.5), 2000),
+        np.array(strikes, dtype=float) if strikes else np.array([S0]),
+    ]))
+    pnl = position_pnl(legs, grid, S0, r, q, days_elapsed=horizon)
+
+    profit_unbounded = upper_slope > 1e-9
+    loss_unbounded   = upper_slope < -1e-9
+
+    max_profit = float("inf") if profit_unbounded else float(np.nanmax(pnl))
+    max_loss   = float("-inf") if loss_unbounded else float(np.nanmin(pnl))
+
+    return PayoffBounds(
+        max_profit=max_profit,
+        max_loss=max_loss,
+        profit_unbounded=profit_unbounded,
+        loss_unbounded=loss_unbounded,
+        upper_slope=upper_slope,
+    )
 
 
 # ── Implied volatility solver ─────────────────────────────────────────────────
@@ -266,7 +345,26 @@ def implied_vol(
         if abs(bs_price(opt, S, K, T, r, sigma, q) - market_price) < tol:
             return float(sigma)
 
-    return float(sigma) if 0 < sigma < 20 else None
+    if 0 < sigma < 20 and abs(bs_price(opt, S, K, T, r, sigma, q) - market_price) < tol:
+        return float(sigma)
+
+    # Newton failed (deep ITM/OTM: vanishing vega). Bisection fallback — the BS
+    # price is monotone in sigma, so this converges whenever a root exists.
+    lo, hi = 1e-4, 20.0
+    p_lo = bs_price(opt, S, K, T, r, lo, q)
+    p_hi = bs_price(opt, S, K, T, r, hi, q)
+    if not (p_lo <= market_price <= p_hi):
+        return None
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        p_mid = bs_price(opt, S, K, T, r, mid, q)
+        if abs(p_mid - market_price) < tol:
+            return float(mid)
+        if p_mid < market_price:
+            lo = mid
+        else:
+            hi = mid
+    return float(0.5 * (lo + hi))
 
 
 # ── Templates ─────────────────────────────────────────────────────────────────

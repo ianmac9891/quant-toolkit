@@ -1,11 +1,9 @@
 [theme]
-# Restrained, functional, dark-friendly. Override here if you want light.
 base = "dark"
 primaryColor = "#4F8EF7"
-backgroundColor = "#0E1117"
-secondaryBackgroundColor = "#1A1F2B"
+backgroundColor = "#0A0C10"
+secondaryBackgroundColor = "#161A23"
 textColor = "#E5E7EB"
-font = "monospace"
 
 [server]
 headless = true

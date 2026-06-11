@@ -1,4 +1,4 @@
-"""Event Study — measure abnormal returns around a user-specified event date."""
+"""Event Study — market-model abnormal returns with Brown-Warner, Patell, and BMP inference."""
 
 from datetime import date, timedelta
 
@@ -7,55 +7,68 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import ui
 from src import event_study as es
-from src.theme import PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, REFLINE, apply_chart_theme
+from src.theme import (
+    PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, REFLINE,
+    PRIMARY_18, CHART_CONFIG, apply_chart_theme,
+)
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+ui.page_header(
+    "Equity Research", "Event Study",
+    "Abnormal returns around announcement dates under the market model "
+    "(Brown-Warner OLS), with Patell standardized-residual and BMP "
+    "variance-robust test statistics, and cross-sectional aggregation "
+    "across multiple events.",
+)
 
-st.sidebar.header("Settings")
-
-ticker = st.sidebar.text_input("Ticker", value="AAPL").upper().strip()
-benchmark = st.sidebar.text_input("Benchmark", value="SPY").upper().strip()
+# ── Parameters ────────────────────────────────────────────────────────────────
 
 today = date.today()
-event_date_single = st.sidebar.date_input(
-    "Event date",
-    value=today - timedelta(days=30),
-    max_value=today - timedelta(days=1),
-    help="The date of the event. If it falls on a weekend or holiday, the next trading day is used.",
-)
 
-multi_mode = st.sidebar.checkbox(
-    "Multi-event mode",
-    value=False,
-    help="Paste multiple dates (one per line, YYYY-MM-DD) to aggregate abnormal returns across events.",
-)
+with ui.panel("Parameters"):
+    c1, c2, c3 = st.columns([1, 1, 1.4])
+    with c1:
+        ticker = st.text_input("Instrument", value="AAPL").upper().strip()
+    with c2:
+        benchmark = st.text_input("Benchmark", value="SPY").upper().strip()
+    with c3:
+        event_date_single = st.date_input(
+            "Event Date",
+            value=today - timedelta(days=30),
+            max_value=today - timedelta(days=1),
+            help="If the date falls on a non-trading day, the next session is used.",
+        )
 
-multi_dates_raw = ""
-if multi_mode:
-    multi_dates_raw = st.sidebar.text_area(
-        "Event dates (one per line, YYYY-MM-DD)",
-        height=120,
-        help="Each date is processed with its own estimation window. Results are averaged.",
+    c4, c5, c6, c7 = st.columns(4)
+    with c4:
+        estimation_days = st.slider(
+            "Estimation Window (sessions)", min_value=60, max_value=500, value=250, step=10,
+            help="Sessions used to estimate the market-model parameters.",
+        )
+    with c5:
+        buffer_days = st.slider(
+            "Pre-Event Buffer (sessions)", min_value=5, max_value=60, value=30, step=5,
+            help="Gap between the estimation window and the event, to avoid "
+                 "contamination from pre-event drift.",
+        )
+    with c6:
+        pre_event = st.slider("Event Window: Sessions Before", 1, 20, 5, step=1)
+    with c7:
+        post_event = st.slider("Event Window: Sessions After", 1, 20, 5, step=1)
+
+    multi_mode = st.checkbox(
+        "Multi-Event Aggregation",
+        value=False,
+        help="Provide multiple dates to aggregate abnormal returns cross-sectionally.",
     )
+    multi_dates_raw = ""
+    if multi_mode:
+        multi_dates_raw = st.text_area(
+            "Event Dates (one per line, YYYY-MM-DD)", height=120,
+            help="Each date is processed with its own estimation window; results are aggregated.",
+        )
 
-estimation_days = st.sidebar.slider(
-    "Estimation window (trading days)", min_value=60, max_value=500, value=250, step=10,
-    help="Number of trading days used to estimate the market model parameters.",
-)
-buffer_days = st.sidebar.slider(
-    "Pre-event buffer (trading days)", min_value=5, max_value=60, value=30, step=5,
-    help="Gap between the end of the estimation window and the event date, to avoid contamination from pre-event drift.",
-)
-pre_event = st.sidebar.slider(
-    "Event window: days before event", min_value=1, max_value=20, value=5, step=1,
-)
-post_event = st.sidebar.slider(
-    "Event window: days after event", min_value=1, max_value=20, value=5, step=1,
-)
-
-
-# ── Parse dates ───────────────────────────────────────────────────────────────
 
 def _parse_multi_dates(raw: str) -> list[date]:
     dates = []
@@ -66,7 +79,7 @@ def _parse_multi_dates(raw: str) -> list[date]:
         try:
             dates.append(date.fromisoformat(line))
         except ValueError:
-            st.warning(f"Skipping unrecognised date: '{line}'")
+            ui.banner("warn", f"Skipping unrecognised date: <span class='mono'>{line}</span>")
     return sorted(set(dates))
 
 
@@ -87,247 +100,235 @@ def _run_multi(ticker, event_dates_tuple, benchmark, est_days, buf, pre, post):
 def _ar_bar_chart(event_times: np.ndarray, ar: np.ndarray, title: str) -> go.Figure:
     colors = [POSITIVE if v >= 0 else NEGATIVE for v in ar]
     fig = go.Figure(go.Bar(
-        x=event_times, y=ar * 100,
-        marker_color=colors,
-        text=[f"{v*100:+.2f}%" for v in ar],
-        textposition="outside",
-        hovertemplate="Day %{x}<br>AR: %{y:.3f}%<extra></extra>",
+        x=event_times, y=ar * 100, marker_color=colors,
+        text=[f"{v*100:+.2f}%" for v in ar], textposition="outside",
+        hovertemplate="Session %{x}<br>AR: %{y:.3f}%<extra></extra>",
     ))
     fig.add_hline(y=0, line_color=REFLINE, line_width=1)
     fig.update_layout(
-        title=title,
-        xaxis_title="Event time (trading days)",
+        title=title, xaxis_title="Event time (sessions)",
         yaxis_title="Abnormal return (%)",
-        height=320,
-        margin=dict(l=10, r=10, t=40, b=10),
-        showlegend=False,
+        height=320, margin=dict(l=10, r=10, t=40, b=10), showlegend=False,
     )
     apply_chart_theme(fig)
     return fig
 
 
-def _car_line_chart(
-    event_times: np.ndarray, car: np.ndarray, sigma_e: float, title: str
-) -> go.Figure:
+def _car_line_chart(event_times: np.ndarray, car: np.ndarray, sigma_e: float, title: str) -> go.Figure:
     days_elapsed = np.arange(1, len(car) + 1)
     ci_upper = car * 100 + 1.96 * sigma_e * np.sqrt(days_elapsed) * 100
     ci_lower = car * 100 - 1.96 * sigma_e * np.sqrt(days_elapsed) * 100
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=event_times, y=ci_upper,
-        mode="lines", line=dict(width=0), showlegend=False,
-    ))
-    fig.add_trace(go.Scatter(
-        x=event_times, y=ci_lower,
-        mode="lines", line=dict(width=0),
-        fill="tonexty", fillcolor="rgba(79,142,247,0.15)",
-        name="95% CI",
-    ))
-    fig.add_trace(go.Scatter(
-        x=event_times, y=car * 100,
-        mode="lines+markers", line=dict(color=PRIMARY, width=2),
-        name="CAR",
-    ))
+    fig.add_trace(go.Scatter(x=event_times, y=ci_upper, mode="lines",
+                             line=dict(width=0), showlegend=False))
+    fig.add_trace(go.Scatter(x=event_times, y=ci_lower, mode="lines",
+                             line=dict(width=0), fill="tonexty",
+                             fillcolor=PRIMARY_18, name="95% CI"))
+    fig.add_trace(go.Scatter(x=event_times, y=car * 100, mode="lines+markers",
+                             line=dict(color=PRIMARY, width=2), name="CAR"))
     fig.add_hline(y=0, line_color=REFLINE, line_width=1)
     fig.update_layout(
-        title=title,
-        xaxis_title="Event time (trading days)",
+        title=title, xaxis_title="Event time (sessions)",
         yaxis_title="Cumulative abnormal return (%)",
-        height=320,
-        margin=dict(l=10, r=10, t=40, b=10),
+        height=320, margin=dict(l=10, r=10, t=40, b=10),
     )
     apply_chart_theme(fig)
     return fig
 
 
-def _actual_vs_predicted_chart(
-    event_times: np.ndarray,
-    actual: np.ndarray,
-    predicted: np.ndarray,
-) -> go.Figure:
+def _actual_vs_predicted_chart(event_times, actual, predicted) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=event_times, y=actual * 100,
-        mode="lines+markers", line=dict(color=PRIMARY, width=2),
-        name="Actual return",
-    ))
-    fig.add_trace(go.Scatter(
-        x=event_times, y=predicted * 100,
-        mode="lines+markers", line=dict(color=BENCHMARK, width=2, dash="dash"),
-        name="Model predicted",
-    ))
+    fig.add_trace(go.Scatter(x=event_times, y=actual * 100, mode="lines+markers",
+                             line=dict(color=PRIMARY, width=2), name="Realized return"))
+    fig.add_trace(go.Scatter(x=event_times, y=predicted * 100, mode="lines+markers",
+                             line=dict(color=BENCHMARK, width=2, dash="dash"),
+                             name="Market-model prediction"))
     fig.add_hline(y=0, line_color=REFLINE, line_width=1)
     fig.update_layout(
-        title="Actual vs. market-model predicted return",
-        xaxis_title="Event time (trading days)",
-        yaxis_title="Return (%)",
-        height=320,
-        margin=dict(l=10, r=10, t=40, b=10),
+        title="Realized vs market-model predicted return",
+        xaxis_title="Event time (sessions)", yaxis_title="Return (%)",
+        height=320, margin=dict(l=10, r=10, t=40, b=10),
     )
     apply_chart_theme(fig)
     return fig
 
 
-# ── Verdict formatting ────────────────────────────────────────────────────────
+def _sig_tag(p: float) -> str:
+    if not np.isfinite(p):
+        return ui.tag("N/A", "neu")
+    if p < 0.05:
+        return ui.tag(f"SIGNIFICANT AT 5% (p = {p:.4f})", "pos")
+    return ui.tag(f"NOT SIGNIFICANT (p = {p:.4f})", "neu")
 
-def _verdict_md(significant: bool, p_value: float) -> str:
-    if significant:
-        return f"<span style='color:{POSITIVE};font-weight:bold'>Significant at 5% (p = {p_value:.4f})</span>"
-    return f"<span style='color:{NEUTRAL}'>Not significant (p = {p_value:.4f})</span>"
+
+def _fmt_stat(v: float, fmt: str = "{:.3f}") -> str:
+    return fmt.format(v) if np.isfinite(v) else "—"
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Run ───────────────────────────────────────────────────────────────────────
 
-st.title("Event Study")
+if not ticker or not benchmark:
+    ui.banner("info", "Enter an instrument and a benchmark to begin.")
+    st.stop()
 
-# Collect and validate event dates
 if multi_mode:
     event_dates = _parse_multi_dates(multi_dates_raw)
     if not event_dates:
-        st.info("Enter one or more event dates in the sidebar to run the study.")
+        ui.banner("info", "Enter one or more event dates above to run the study.")
         st.stop()
 else:
     event_dates = [event_date_single]
 
-st.markdown(
-    f"**{ticker}** vs **{benchmark}** · "
-    f"Estimation window: {estimation_days} days · Buffer: {buffer_days} days · "
-    f"Event window: [{-pre_event}, +{post_event}]"
+st.caption(
+    f"{ticker} vs {benchmark} · Estimation window {estimation_days} sessions · "
+    f"Buffer {buffer_days} sessions · Event window [{-pre_event}, +{post_event}]"
 )
 
-# ── Run ───────────────────────────────────────────────────────────────────────
-
 if multi_mode and len(event_dates) > 1:
-    with st.spinner("Fetching data and running multi-event study…"):
+    with st.spinner("Running multi-event study..."):
         try:
-            result = _run_multi(
-                ticker, tuple(event_dates), benchmark,
-                estimation_days, buffer_days, pre_event, post_event,
-            )
+            result = _run_multi(ticker, tuple(event_dates), benchmark,
+                                estimation_days, buffer_days, pre_event, post_event)
         except ValueError as e:
-            st.error(str(e))
+            ui.banner("error", str(e))
             st.stop()
         except Exception as e:
-            st.error(f"Unexpected error: {e}")
+            ui.banner("error", f"Unexpected error: {e}")
             st.stop()
 
-    st.subheader("Aggregate results")
     n_events = len(result.per_event)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Events processed", n_events)
-    c2.metric("Mean CAR", f"{result.mean_car[-1]*100:+.2f}%")
-    c3.metric("t-statistic", f"{result.t_stat:.3f}" if np.isfinite(result.t_stat) else "—")
-    c4.metric("p-value", f"{result.p_value:.4f}" if np.isfinite(result.p_value) else "—")
-    st.markdown(
-        _verdict_md(result.significant, result.p_value) +
-        "  &nbsp;&nbsp;Cross-sectional t-test on the distribution of individual CARs.",
-        unsafe_allow_html=True,
-    )
+    ui.kpi_row([
+        {"label": "Events Processed", "value": f"{n_events}"},
+        {"label": "Mean CAR", "value": f"{result.mean_car[-1]*100:+.2f}%"},
+        {"label": "Cross-Sectional t", "value": _fmt_stat(result.t_stat)},
+        {"label": "Patell Z", "value": _fmt_stat(result.patell_z)},
+        {"label": "BMP t", "value": _fmt_stat(result.bmp_t)},
+    ])
 
-    st.plotly_chart(
-        _ar_bar_chart(result.event_times, result.mean_ar, "Mean abnormal return by event day"),
-        use_container_width=True, config={"responsive": True, "displayModeBar": False},
-    )
-    # Use average sigma_e for CI
-    avg_sigma = float(np.mean([e.fit.sigma_e for e in result.per_event]))
-    st.plotly_chart(
-        _car_line_chart(result.event_times, result.mean_car, avg_sigma, "Mean cumulative abnormal return"),
-        use_container_width=True, config={"responsive": True, "displayModeBar": False},
-    )
-
-    st.subheader("Per-event detail")
-    rows = []
-    for e in result.per_event:
-        rows.append({
-            "Event date": str(e.event_date),
-            "CAR": f"{e.car_total*100:+.2f}%",
-            "t-stat": f"{e.t_stat:.3f}" if np.isfinite(e.t_stat) else "—",
-            "p-value": f"{e.p_value:.4f}" if np.isfinite(e.p_value) else "—",
-            "Significant": "Yes" if e.significant else "No",
-            "Beta": f"{e.fit.beta:.3f}",
-            "R²": f"{e.fit.r_squared:.3f}",
-        })
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-
-else:
-    # Single event
-    ed = event_dates[0]
-    with st.spinner(f"Fetching data and running event study for {ticker} on {ed}…"):
-        try:
-            result = _run_single(
-                ticker, ed, benchmark, estimation_days, buffer_days, pre_event, post_event,
-            )
-        except ValueError as e:
-            st.error(str(e))
-            st.stop()
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            st.stop()
-
-    fit = result.fit
-    st.subheader("Market model & event-window summary")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("α (alpha)", f"{fit.alpha*100:.4f}%", help="Daily intercept from the estimation window OLS.")
-    c2.metric("β (beta)",  f"{fit.beta:.4f}",        help="Market sensitivity from the estimation window OLS.")
-    c3.metric("R²",        f"{fit.r_squared:.4f}",   help="Market model in-sample R-squared.")
-
-    c4, c5, c6, c7 = st.columns(4)
-    c4.metric("CAR", f"{result.car_total*100:+.2f}%",
-              help=f"Cumulative abnormal return over [{-pre_event}, +{post_event}] event window.")
-    c5.metric("SE(CAR)", f"{result.se_car*100:.4f}%",
-              help="σ_e × √L where L = event window length.")
-    c6.metric("t-statistic", f"{result.t_stat:.3f}" if np.isfinite(result.t_stat) else "—")
-    c7.metric("p-value", f"{result.p_value:.4f}" if np.isfinite(result.p_value) else "—")
-
-    st.markdown(_verdict_md(result.significant, result.p_value), unsafe_allow_html=True)
+    with ui.panel("Statistical Significance Assessment"):
+        st.markdown(
+            f"Cross-sectional t-test on raw CARs: {_sig_tag(result.p_value)}<br>"
+            f"Patell standardized-residual Z: {_sig_tag(result.patell_p)}<br>"
+            f"BMP variance-robust t: {_sig_tag(result.bmp_p)}",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "The BMP statistic is robust to event-induced variance inflation and is "
+            "the preferred test when events coincide with volatility spikes. "
+            "Divergence between the naive and BMP results typically indicates "
+            "exactly that condition."
+        )
 
     col_a, col_b = st.columns(2)
     with col_a:
         st.plotly_chart(
-            _ar_bar_chart(result.event_times, result.ar, "Abnormal return by event day"),
-            use_container_width=True, config={"responsive": True, "displayModeBar": False},
+            _ar_bar_chart(result.event_times, result.mean_ar, "Mean abnormal return by session"),
+            width="stretch", config=CHART_CONFIG,
+        )
+    with col_b:
+        avg_sigma = float(np.mean([e.fit.sigma_e for e in result.per_event]))
+        st.plotly_chart(
+            _car_line_chart(result.event_times, result.mean_car, avg_sigma,
+                            "Mean cumulative abnormal return"),
+            width="stretch", config=CHART_CONFIG,
+        )
+
+    with ui.panel("Per-Event Detail"):
+        rows = []
+        for e in result.per_event:
+            rows.append({
+                "Event Date":  str(e.event_date),
+                "CAR":         f"{e.car_total*100:+.2f}%",
+                "t":           _fmt_stat(e.t_stat),
+                "Patell Z":    _fmt_stat(e.patell_z),
+                "p (naive)":   _fmt_stat(e.p_value, "{:.4f}"),
+                "Significant": "Yes" if e.significant else "No",
+                "Beta":        f"{e.fit.beta:.3f}",
+                "R²":          f"{e.fit.r_squared:.3f}",
+            })
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+else:
+    ed = event_dates[0]
+    with st.spinner(f"Running event study for {ticker} on {ed}..."):
+        try:
+            result = _run_single(ticker, ed, benchmark, estimation_days,
+                                 buffer_days, pre_event, post_event)
+        except ValueError as e:
+            ui.banner("error", str(e))
+            st.stop()
+        except Exception as e:
+            ui.banner("error", f"Unexpected error: {e}")
+            st.stop()
+
+    fit = result.fit
+    ui.kpi_row([
+        {"label": "Alpha (daily)", "value": f"{fit.alpha*100:.4f}%"},
+        {"label": "Beta", "value": f"{fit.beta:.4f}"},
+        {"label": "Model R²", "value": f"{fit.r_squared:.4f}"},
+        {"label": "CAR", "value": f"{result.car_total*100:+.2f}%",
+         "delta_kind": "pos" if result.car_total >= 0 else "neg"},
+        {"label": "SE(CAR)", "value": f"{result.se_car*100:.3f}%"},
+    ])
+
+    with ui.panel("Statistical Significance Assessment"):
+        st.markdown(
+            f"Brown-Warner t = <span class='mono'>{_fmt_stat(result.t_stat)}</span>: "
+            f"{_sig_tag(result.p_value)}<br>"
+            f"Patell Z = <span class='mono'>{_fmt_stat(result.patell_z)}</span>: "
+            f"{_sig_tag(result.patell_p)}",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "The Patell test scales each abnormal return by its prediction-error-"
+            "corrected standard deviation; it remains sensitive to event-induced "
+            "variance, which requires a cross-section of events (BMP test, "
+            "available in multi-event mode) to address."
+        )
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.plotly_chart(
+            _ar_bar_chart(result.event_times, result.ar, "Abnormal return by session"),
+            width="stretch", config=CHART_CONFIG,
         )
     with col_b:
         st.plotly_chart(
             _car_line_chart(result.event_times, result.car, fit.sigma_e,
                             "Cumulative abnormal return with 95% CI"),
-            use_container_width=True, config={"responsive": True, "displayModeBar": False},
+            width="stretch", config=CHART_CONFIG,
         )
 
     st.plotly_chart(
         _actual_vs_predicted_chart(result.event_times, result.actual_return, result.predicted_return),
-        use_container_width=True, config={"responsive": True, "displayModeBar": False},
+        width="stretch", config=CHART_CONFIG,
     )
 
-# ── Caveats ───────────────────────────────────────────────────────────────────
+# ── Methodology ───────────────────────────────────────────────────────────────
 
-with st.expander("Methodology and caveats"):
+with st.expander("Methodology and Limitations"):
     st.markdown("""
-**Market model OLS**
+**Market model OLS.** The instrument's daily return is regressed on the benchmark
+return over an estimation window ending at least *buffer* sessions before the
+event. The residual standard error captures idiosyncratic daily volatility.
 
-The market model regresses the ticker's daily simple return on the benchmark return
-over an estimation window ending at least *buffer* days before the event, to avoid
-contamination from pre-event drift. The intercept (α) and slope (β) are estimated
-by OLS; the residual standard error σ_e captures idiosyncratic daily volatility.
+**Test statistics.**
+- *Brown-Warner (1985)*: CAR / (sigma_e × sqrt(L)). Assumes constant residual
+  variance through the event window.
+- *Patell (1976)*: standardizes each abnormal return by its prediction-error-
+  corrected standard deviation before aggregating. Corrects for estimation
+  error but still assumes no event-induced variance.
+- *BMP (1991)*, multi-event only: cross-sectional t-test on standardized CARs.
+  Robust to event-induced variance inflation.
 
-**SE(CAR) and the t-statistic**
-
-Under the standard event-study framework (Brown & Warner 1985), the variance of the
-CAR is σ_e² × L where L is the number of days in the event window. This assumes
-constant residual variance through the event period.
-
-**Known limitations**
-
-- **Variance inflation at events.** The constant-variance assumption is violated
-  when events trigger volatility spikes. The Patell (1976) standardised residual
-  test and the Boehmer-Musumeci-Poulsen (1991) test correct for this.
-- **Event clustering.** When multiple events occur at the same calendar time
-  (e.g., earnings seasons), cross-sectional returns are correlated and the
-  standard t-test is no longer valid.
-- **Pre-event abnormal returns.** A statistically significant negative (or positive)
-  cumulative AR in the days before the event may indicate information leakage or
-  anticipation by the market rather than a reaction to the event itself.
-- **Non-trading day snap.** If the event date falls on a weekend or holiday, the
-  study uses the next available trading day, which may understate the day-0 reaction.
+**Known limitations.**
+- *Event clustering*: when multiple events share calendar time, cross-sectional
+  returns are correlated and all three tests overstate significance.
+- *Pre-event drift*: significant abnormal returns before the event suggest
+  information leakage or anticipation rather than reaction.
+- *Non-trading day snap*: events on weekends or holidays are mapped to the next
+  session, which can dilute the measured day-zero reaction.
 """)
+
+ui.footer_disclaimer()

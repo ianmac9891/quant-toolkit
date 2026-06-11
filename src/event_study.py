@@ -9,7 +9,16 @@ Method (Brown & Warner 1985 OLS):
   SE(CAR) = sigma_e * sqrt(L),  L = event window length
   t-stat = CAR / SE(CAR),  df = N - 2
 
-Multi-event: cross-sectional average of CARs, t-stat across the distribution.
+Additional test statistics:
+  Patell (1976): standardized abnormal returns SAR_t = AR_t / (sigma_e * sqrt(C_t)),
+    where C_t = 1 + 1/n + (R_mt - R̄_m)^2 / SS_m corrects for out-of-sample
+    prediction error. Z = sum(SAR_t) / sqrt(L * (n-2)/(n-4)), asymptotically N(0,1).
+  BMP / Boehmer-Musumeci-Poulsen (1991), multi-event only: per-event standardized
+    CARs (Patell scaling), then a cross-sectional t-test on the SCARs. Robust to
+    event-induced variance inflation, which both the naive and Patell tests assume away.
+
+Multi-event: cross-sectional average of CARs, t-stat across the distribution,
+plus aggregated Patell Z and the BMP t-statistic.
 """
 
 from __future__ import annotations
@@ -32,6 +41,8 @@ class MarketModelFit:
     r_squared: float
     sigma_e: float   # residual std error, daily
     n_obs: int       # estimation window observations used
+    mkt_mean: float  # mean market return in the estimation window (Patell C_t)
+    mkt_ss: float    # sum of squared market-return deviations (Patell C_t)
 
 
 @dataclass
@@ -47,9 +58,12 @@ class EventResult:
     fit: MarketModelFit
     car_total: float
     se_car: float
-    t_stat: float
+    t_stat: float                # Brown-Warner naive t
     p_value: float
-    significant: bool            # two-sided, alpha=0.05
+    significant: bool            # two-sided, alpha=0.05, on the naive t
+    patell_z: float = float("nan")
+    patell_p: float = float("nan")
+    scar: float = float("nan")   # standardized CAR (Patell scaling) — BMP input
 
 
 @dataclass
@@ -61,9 +75,13 @@ class MultiEventResult:
     mean_ar: np.ndarray
     mean_car: np.ndarray
     se_mean_car: float
-    t_stat: float
+    t_stat: float                # cross-sectional t on raw CARs
     p_value: float
     significant: bool
+    patell_z: float = float("nan")
+    patell_p: float = float("nan")
+    bmp_t: float = float("nan")
+    bmp_p: float = float("nan")
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
@@ -150,7 +168,10 @@ def _fit_market_model(
     r_sq   = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else 0.0
     sigma_e = float(np.sqrt(ss_res / max(n - 2, 1)))
 
-    return MarketModelFit(alpha=alpha, beta=beta, r_squared=r_sq, sigma_e=sigma_e, n_obs=n)
+    return MarketModelFit(
+        alpha=alpha, beta=beta, r_squared=r_sq, sigma_e=sigma_e, n_obs=n,
+        mkt_mean=float(x.mean()), mkt_ss=float(((x - x.mean()) ** 2).sum()),
+    )
 
 
 # ── Event-window extraction ───────────────────────────────────────────────────
@@ -183,7 +204,29 @@ def _event_window(
     ar           = actual_ret - predicted
     car          = np.cumsum(ar)
 
-    return event_times, ar, car, actual_ret, predicted
+    return event_times, ar, car, actual_ret, predicted, market_ret
+
+
+def _patell_stats(
+    fit: MarketModelFit, ar: np.ndarray, market_ret: np.ndarray
+) -> Tuple[float, float, float]:
+    """(patell_z, patell_p, scar) for one event window.
+
+    C_t corrects each prediction for estimation error; SAR variance under the
+    market model is (n−2)/(n−4). SCAR is the Patell-scaled standardized CAR
+    used as the input to the BMP cross-sectional test.
+    """
+    n, L = fit.n_obs, len(ar)
+    if L == 0 or n <= 4 or fit.sigma_e <= 0 or fit.mkt_ss <= 0:
+        return float("nan"), float("nan"), float("nan")
+
+    c_t = 1.0 + 1.0 / n + (market_ret - fit.mkt_mean) ** 2 / fit.mkt_ss
+    sar = ar / (fit.sigma_e * np.sqrt(c_t))
+
+    z = float(sar.sum() / np.sqrt(L * (n - 2) / (n - 4)))
+    p = float(2 * stats.norm.sf(abs(z)))
+    scar = float(ar.sum() / (fit.sigma_e * np.sqrt(c_t.sum())))
+    return z, p, scar
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -202,7 +245,7 @@ def run_single_event(
         ticker, benchmark, [event_date], estimation_days, buffer_days, pre_event, post_event
     )
     fit = _fit_market_model(ret_t, ret_m, event_date, estimation_days, buffer_days)
-    event_times, ar, car, actual_ret, predicted = _event_window(
+    event_times, ar, car, actual_ret, predicted, market_ret = _event_window(
         ret_t, ret_m, event_date, fit, pre_event, post_event
     )
 
@@ -212,6 +255,7 @@ def run_single_event(
     t_stat    = float(car_total / se_car) if se_car > 0 else np.nan
     df        = fit.n_obs - 2
     p_value   = float(2 * stats.t.sf(abs(t_stat), df=df)) if np.isfinite(t_stat) else np.nan
+    patell_z, patell_p, scar = _patell_stats(fit, ar, market_ret)
 
     return EventResult(
         event_date=event_date, ticker=ticker, benchmark=benchmark,
@@ -220,6 +264,7 @@ def run_single_event(
         fit=fit, car_total=car_total, se_car=se_car,
         t_stat=t_stat, p_value=p_value,
         significant=bool(p_value < 0.05) if np.isfinite(p_value) else False,
+        patell_z=patell_z, patell_p=patell_p, scar=scar,
     )
 
 
@@ -241,7 +286,7 @@ def run_multi_event(
     for ed in event_dates:
         try:
             fit = _fit_market_model(ret_t, ret_m, ed, estimation_days, buffer_days)
-            event_times, ar, car, actual_ret, pred = _event_window(
+            event_times, ar, car, actual_ret, pred, mkt = _event_window(
                 ret_t, ret_m, ed, fit, pre_event, post_event
             )
             L        = len(ar)
@@ -250,6 +295,7 @@ def run_multi_event(
             t_ev     = float(car_tot / se_c) if se_c > 0 else np.nan
             df       = fit.n_obs - 2
             p_ev     = float(2 * stats.t.sf(abs(t_ev), df=df)) if np.isfinite(t_ev) else np.nan
+            pz, pp, scar = _patell_stats(fit, ar, mkt)
             per_event.append(EventResult(
                 event_date=ed, ticker=ticker, benchmark=benchmark,
                 event_times=event_times, ar=ar, car=car,
@@ -257,6 +303,7 @@ def run_multi_event(
                 fit=fit, car_total=car_tot, se_car=se_c,
                 t_stat=t_ev, p_value=p_ev,
                 significant=bool(p_ev < 0.05) if np.isfinite(p_ev) else False,
+                patell_z=pz, patell_p=pp, scar=scar,
             ))
         except (ValueError, IndexError):
             continue
@@ -276,10 +323,30 @@ def run_multi_event(
     t_cs  = float(cars.mean() / se_cs) if np.isfinite(se_cs) and se_cs > 0 else np.nan
     p_cs  = float(2 * stats.t.sf(abs(t_cs), df=n - 1)) if np.isfinite(t_cs) else np.nan
 
+    # Aggregated Patell Z: sum of per-event Z components, scaled by sqrt(N)
+    zs = np.array([e.patell_z for e in per_event])
+    zs = zs[np.isfinite(zs)]
+    if len(zs) > 0:
+        patell_z = float(zs.sum() / np.sqrt(len(zs)))
+        patell_p = float(2 * stats.norm.sf(abs(patell_z)))
+    else:
+        patell_z, patell_p = np.nan, np.nan
+
+    # BMP: cross-sectional t-test on the Patell-scaled SCARs — robust to
+    # event-induced variance inflation.
+    scars = np.array([e.scar for e in per_event])
+    scars = scars[np.isfinite(scars)]
+    if len(scars) > 1 and scars.std(ddof=1) > 0:
+        bmp_t = float(scars.mean() / (scars.std(ddof=1) / np.sqrt(len(scars))))
+        bmp_p = float(2 * stats.t.sf(abs(bmp_t), df=len(scars) - 1))
+    else:
+        bmp_t, bmp_p = np.nan, np.nan
+
     return MultiEventResult(
         ticker=ticker, benchmark=benchmark,
         per_event=per_event, event_times=event_times,
         mean_ar=mean_ar, mean_car=mean_car,
         se_mean_car=se_cs, t_stat=t_cs, p_value=p_cs,
         significant=bool(p_cs < 0.05) if np.isfinite(p_cs) else False,
+        patell_z=patell_z, patell_p=patell_p, bmp_t=bmp_t, bmp_p=bmp_p,
     )

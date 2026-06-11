@@ -73,21 +73,37 @@ def sample_mean(returns: pd.DataFrame) -> pd.Series:
     return (1 + returns).prod() ** (TRADING_DAYS / n) - 1
 
 
-def james_stein_mean(returns: pd.DataFrame, shrinkage: float = 0.5) -> pd.Series:
+def james_stein_mean(
+    returns: pd.DataFrame, shrinkage: float | None = None
+) -> pd.Series:
     """
     James-Stein estimator: shrinks each asset's sample mean toward the grand mean.
 
     μ_shrunk = (1 − w) · μ_sample + w · μ̄ · 1
     where μ̄ = mean(μ_sample) is the equal-weighted grand mean.
 
-    # TODO: replace fixed shrinkage with the data-driven JS intensity:
-    # w = min(1, (k − 2) · σ² / ‖μ − μ̄·1‖²)
-    # where k = number of assets and σ² = mean(diag(Σ)) / T is the average
-    # variance of the individual mean estimates. Requires estimating Σ first.
-    # Fixed 0.5 is a reasonable conservative default for now.
+    When shrinkage is None (default) the intensity is data-driven:
+        w = min(1, (k − 2) · σ̄² / ‖μ − μ̄·1‖²)
+    where k is the number of assets and σ̄² is the average sampling variance of
+    the annualized mean estimates — diag of the daily covariance scaled by
+    252²/T (variance of a mean of T daily observations, annualized). Dispersed
+    sample means relative to their estimation noise → little shrinkage; means
+    indistinguishable from noise → full shrinkage to the grand mean.
+    Pass an explicit float in [0, 1] to override.
     """
     mu = sample_mean(returns)
     grand_mean = float(mu.mean())
+
+    if shrinkage is None:
+        k = len(mu)
+        T = len(returns)
+        if k < 3 or T < 2:
+            shrinkage = 1.0 if k > 0 else 0.0
+        else:
+            est_var = float(np.mean(returns.var(ddof=1).values)) * (TRADING_DAYS ** 2) / T
+            dispersion = float(((mu - grand_mean) ** 2).sum())
+            shrinkage = 1.0 if dispersion <= 1e-18 else min(1.0, (k - 2) * est_var / dispersion)
+
     return (1.0 - shrinkage) * mu + shrinkage * grand_mean
 
 

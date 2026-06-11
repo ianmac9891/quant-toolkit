@@ -1,11 +1,11 @@
 {
-  "name": "Quant Toolkit",
-  "short_name": "Quant",
-  "description": "Quantitative analysis workbench for equity research and portfolio analysis.",
+  "name": "Quant Research Terminal",
+  "short_name": "QRT",
+  "description": "Institutional-style analytics for equity research, portfolio construction, risk measurement, and systematic strategy validation.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0E1117",
+  "background_color": "#0A0C10",
   "theme_color": "#4F8EF7",
   "orientation": "any",
   "icons": [

@@ -23,7 +23,24 @@ python -c "from src.data import clear_cache; clear_cache('AAPL')"
 
 ## Architecture
 
+The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit app. `app.py` registers all pages with `st.navigation(position="hidden")`; `home.py` is the landing page with HTML navigation cards (rendered via `st.html` — block-level HTML inside an `<a>` breaks `st.markdown`'s parser); each tool page carries a top bar that routes back to `/`.
+
 **Layer separation is the core design principle.** `src/` is a pure Python library — no Streamlit imports. `pages/` is thin UI that imports from `src/`. This means analysis functions can be used from notebooks or scripts without touching Streamlit.
+
+**`ui.py` (root level)** is the Streamlit-side design system, kept out of `src/` to preserve that rule:
+- `inject_design_system()` — the full CSS (fonts, panels, inputs, custom `qrt-*` classes); injected once in `app.py`
+- `page_header(section, title, description)` — top bar + page title; required on every page
+- `panel(title)` — context manager wrapping `st.container(border=True)` with a kicker label
+- `kpi_row(items)`, `banner(kind, body)`, `tag(text, kind)`, `nav_card(...)`, `footer_disclaimer()`
+- `date_range_input(...)` — guards the mid-selection state of range `st.date_input` (one date picked → would crash on tuple unpack); **always use this for date ranges**
+- `rf_rate_input()` — the single risk-free convention: entered in percent, returned as decimal
+- Pages never call `st.metric` / `st.info` / `st.warning` / `st.error` directly — use `kpi_row` and `banner`. No emojis or Material icons anywhere.
+
+**Pages** (registered in `app.py` with stable `url_path`s):
+- Equity Research: `security_analytics.py`, `volatility_analytics.py`, `event_study.py`, `derivatives_workbench.py`
+- Portfolio & Risk: `portfolio_construction.py`, `risk_analytics.py`, `strategy_simulation.py`
+- Systematic Research: `equity_screening.py`, `seasonality_research.py`
+- Expensive pages (construction, simulation, screening) wrap parameters in `st.form` to batch reruns. Portfolio Construction stages its result in `st.session_state["portfolio_weights"/"portfolio_prices"/"portfolio_returns"/"portfolio_method"/"portfolio_cov"]` for Risk Analytics.
 
 **Data flow:**
 1. `src/data.py` defines a `Provider` ABC with `get_prices(ticker, start, end) -> DataFrame`.
@@ -92,21 +109,26 @@ python -c "from src.data import clear_cache; clear_cache('AAPL')"
 - Pre-holiday uses `pandas_market_calendars` (NYSE calendar) with a rule-based fallback if not installed
 - `BucketStats`: `green_rate`, `se_green`, `mean_bps`; `HypothesisResult`: all primary green-rate fields plus secondary `mean_return_bps`, `post_cost_mean_return_bps`
 
-**`src/volforecast.py`** provides GARCH(1,1) volatility forecasting:
-- `fit_garch(prices)` → `GarchFit` — fits on daily **log returns × 100** (not simple returns; log space ensures zero-drift gives flat median); raises `ValueError` if persistence ≥ 1 (non-stationary)
-- `simulate_paths(fit, current_price, horizon, drift_annual, n_sim, seed)` → `VolForecast` — bootstrap resamples empirical standardized residuals (preserves fat tails); initializes GARCH variance at `h_{t+1}` (one-step-ahead), not `h_t`; returns 7 percentile paths (p2.5/10/25/50/75/90/97.5) plus `terminal_prices` array for O(1) live probability queries
-- `analytic_vol_path(fit, horizon)` → `np.ndarray` — closed-form GARCH variance forecast starting from `h_{t+1}`: `h_{t+k} = h_lr + persistence^(k-1) × (h_{t+1} - h_lr)`; converges to long-run vol
-- `p_above(forecast, target)` → `float` — `(terminal_prices > target).mean()`, called outside cache for live target-price updates
-- `GarchFit`: stores `omega`, `alpha`, `beta`, `persistence`, `h_current_pct2`, `h_next_pct2`, `h_lr_pct2`, annualized vols, `vol_regime` ("elevated"/"normal"/"compressed"), AIC, `std_resid`
+**`src/volforecast.py`** provides GARCH/GJR-GARCH volatility forecasting:
+- `fit_garch(prices, model_type="garch"|"gjr")` → `GarchFit` — fits on daily **log returns × 100** (not simple returns; log space ensures zero-drift gives flat median); raises `ValueError` if persistence ≥ 1 (non-stationary). GJR adds the leverage term `γ·ε²·I(ε<0)`; its persistence is `α + β + γ/2`
+- `simulate_paths(fit, current_price, horizon, drift_annual, n_sim, seed)` → `VolForecast` — bootstrap resamples empirical standardized residuals (preserves fat tails); initializes variance at `h_{t+1}` (one-step-ahead), not `h_t`; the recursion includes the GJR gamma term (zero for symmetric GARCH); returns 7 percentile paths (p2.5/10/25/50/75/90/97.5) plus `terminal_prices` array for O(1) live probability queries
+- `analytic_vol_path(fit, horizon)` → `np.ndarray` — closed-form variance forecast starting from `h_{t+1}`: `h_{t+k} = h_lr + persistence^(k-1) × (h_{t+1} - h_lr)`; converges to long-run vol
+- `p_above(forecast, target)` → `float` — `(terminal_prices > target).mean()`, called outside cache for live reference-level updates
+- `GarchFit`: stores `omega`, `alpha`, `beta`, `gamma`, `model`, `persistence`, `h_current_pct2`, `h_next_pct2`, `h_lr_pct2`, annualized vols, `vol_regime` ("elevated"/"normal"/"compressed"), AIC, `std_resid`
 - Requires `arch>=6.3.0` (in requirements.txt)
 
-**`src/theme.py`** is the single source of truth for colors and chart styling:
-- `PRIMARY`, `BENCHMARK`, `POSITIVE`, `NEGATIVE`, `NEUTRAL` — semantic palette constants
-- `PRIMARY_10/18/28/80` — opacity variants used in band fills
-- `GRIDLINE`, `REFLINE` — dark-mode axis and reference-line colors
-- `apply_chart_theme(fig)` — removes the white legend box, sets transparent backgrounds and dark grid lines; uses `update_xaxes`/`update_yaxes` so it works on multi-subplot figures
+**`src/event_study.py`** test statistics: Brown-Warner naive t (constant variance), Patell Z (`_patell_stats` — prediction-error-corrected SARs; `MarketModelFit` carries `mkt_mean`/`mkt_ss` for the C_t correction), and for multi-event runs the BMP (1991) cross-sectional t on Patell-scaled SCARs (robust to event-induced variance).
 
-**Adding a new page:** Create `pages/<N>_<Name>.py` (no emoji in filename). The number controls sidebar order. Import from `src/` only. Apply `apply_chart_theme` to all Plotly figures; use semantic color constants from `src/theme.py` rather than hardcoded color strings.
+**`src/options.py`** conventions: `prob_of_profit` simulates the underlying with a **single volatility** (`underlying_vol`, default `atm_leg_iv` — the leg nearest the money), never an average across legs. `payoff_bounds` determines unbounded profit/loss **analytically** from the net share exposure as S → ∞ (downside is always bounded at S=0) and reads bounded extremes off a dense grid. All terminal metrics (`breakevens`, `payoff_bounds`, `prob_of_profit`) evaluate at `eval_horizon_dte` — the **front** expiration — because a terminal-price model cannot settle expired legs path-dependently. `implied_vol` is Newton with a bisection fallback.
+
+**`src/estimators.py`**: `james_stein_mean(returns, shrinkage=None)` uses the data-driven intensity `w = min(1, (k−2)·σ̄²/‖μ−μ̄1‖²)` when `shrinkage` is None; pass a float to override.
+
+**`src/theme.py`** is the single source of truth for design tokens and chart styling (pure Python, no Streamlit):
+- Surfaces (`CANVAS`, `SURFACE`, `BORDER`, …), text (`TEXT`, `TEXT_MUTED`, …), semantic series palette (`PRIMARY`, `BENCHMARK`, `POSITIVE`, `NEGATIVE`, `NEUTRAL`), opacity variants (`PRIMARY_10/18/28/80`), fonts (`FONT_UI` Inter, `FONT_MONO` IBM Plex Mono)
+- `apply_chart_theme(fig)` — transparent surfaces, hairline grid, mono tick labels; uses `update_xaxes`/`update_yaxes` so it works on multi-subplot figures. It only styles `title_font` when a title exists — Plotly 6 renders the literal string "undefined" otherwise
+- `CHART_CONFIG` — the standard `st.plotly_chart` config dict; use it on every chart
+
+**Adding a new page:** Create `pages/<name>.py` (snake_case, no emoji) and register it in `app.py`'s `st.navigation` list with a `url_path`, then add a `ui.nav_card` for it on `home.py`. Start the page with `ui.page_header(...)`, put inputs in a `ui.panel("Parameters")` (or `st.form` if computation is expensive), import analytics from `src/` only, apply `apply_chart_theme` + `CHART_CONFIG` to all Plotly figures, and end with `ui.footer_disclaimer()`.
 
 ## Environment
 
