@@ -37,6 +37,8 @@ pg = st.navigation(
         st.Page("pages/equity_screening.py",      title="Equity Screening",      url_path="equity-screening"),
         st.Page("pages/seasonality_research.py",  title="Seasonality Research",  url_path="seasonality-research"),
         st.Page("pages/relative_value.py",        title="Relative Value Analysis", url_path="relative-value"),
+        # Macro & Rates
+        st.Page("pages/yield_curve.py",           title="Yield Curve Monitor",     url_path="yield-curve"),
     ],
     position="hidden",
 )

@@ -48,8 +48,10 @@ with ui.panel("Market Parameters"):
     with c3:
         r_pct = st.number_input(
             "Risk-Free Rate (% per annum)", min_value=0.0, max_value=20.0,
-            value=4.5, step=0.25,
-            help="Continuously compounded annualized rate.",
+            value=ui.get_default_rf_pct(), step=0.25,
+            help="Continuously compounded annualized rate. Defaults from the "
+                 "Yield Curve Monitor's current 13-week bill rate when that "
+                 "page has been visited.",
         )
     with c4:
         q_pct = st.number_input(

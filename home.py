@@ -134,6 +134,19 @@ with c8:
          "Spread z-score bands"],
     ))
 
+# ── Macro & Rates ─────────────────────────────────────────────────────────────
+
+ui.section("Macro & Rates")
+c9, c10, c11 = st.columns(3)
+with c9:
+    st.html(ui.nav_card(
+        "yield-curve", "Yield Curve Monitor",
+        "The Treasury curve from bills to bonds: current shape, history by "
+        "tenor, and recession-watch spread inversions.",
+        ["Current curve snapshot", "Yield history by tenor",
+         "10y minus 13w and 30y minus 5y spreads", "App-wide risk-free default"],
+    ))
+
 # ── Data sources ──────────────────────────────────────────────────────────────
 
 st.markdown(
