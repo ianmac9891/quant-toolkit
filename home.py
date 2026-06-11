@@ -40,6 +40,13 @@ with c1:
         "Brown-Warner, Patell, and BMP test statistics and multi-event aggregation.",
         ["Cumulative abnormal return", "Patell and BMP inference", "Multi-event aggregation"],
     ))
+    st.html(ui.nav_card(
+        "earnings-analysis", "Earnings Move Analysis",
+        "Historical earnings-day reactions with the current option-implied "
+        "move shown against the realized distribution.",
+        ["Realized reaction history", "Implied vs trailing realized move",
+         "Distribution of absolute moves"],
+    ))
 with c2:
     st.html(ui.nav_card(
         "volatility-analytics", "Volatility Analytics",
