@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import ui
-from src import data
 from src import pairs as pr
 from src.theme import (
     PRIMARY, BENCHMARK, NEGATIVE, NEUTRAL, REFLINE, TEXT,
@@ -51,20 +50,18 @@ if not ticker_a or not ticker_b or ticker_a == ticker_b:
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch(ticker: str, start: date, end: date) -> pd.Series:
-    df = data.get_prices(ticker, start, end)
-    return df["adj_close"].dropna() if not df.empty else pd.Series(dtype=float)
-
-
 with st.spinner(f"Retrieving {ticker_a} and {ticker_b}..."):
-    pa = _fetch(ticker_a, start_date, end_date)
-    pb = _fetch(ticker_b, start_date, end_date)
+    res_a = ui.fetch_prices(ticker_a, start_date, end_date)
+    res_b = ui.fetch_prices(ticker_b, start_date, end_date)
 
-for t, s in ((ticker_a, pa), (ticker_b, pb)):
-    if s.empty:
-        ui.banner("error", f"No price data for <b>{t}</b>. Verify the symbol.")
+for t, r in ((ticker_a, res_a), (ticker_b, res_b)):
+    if not r.ok or "adj_close" not in r.df.columns:
+        ui.data_unavailable(f"{t}: {r.error or 'no usable columns'}")
         st.stop()
+
+pa = res_a.df["adj_close"].dropna()
+pb = res_b.df["adj_close"].dropna()
+ui.data_asof_caption(min(res_a.asof, res_b.asof), res_a.source)
 
 try:
     res = pr.analyze_pair(pa, pb, ticker_a, ticker_b)

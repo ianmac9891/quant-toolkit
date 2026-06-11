@@ -9,7 +9,6 @@ import streamlit as st
 
 import ui
 from src import anomalies as an
-from src import data as dt
 from src.theme import PRIMARY, BENCHMARK, NEUTRAL, CHART_CONFIG, apply_chart_theme
 
 ui.page_header(
@@ -47,11 +46,6 @@ end_date = today
 
 # ── Cached helpers ────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_prices(ticker: str, start: date, end: date) -> pd.DataFrame:
-    return dt.get_prices(ticker, start, end)
-
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def _run_lab(prices: pd.Series, cost_bps: float) -> list[an.AnomalyCategory]:
     return an.run_anomaly_lab(prices, cost_bps=cost_bps)
@@ -64,15 +58,13 @@ if not ticker:
     st.stop()
 
 with st.spinner(f"Retrieving {ticker} price history..."):
-    try:
-        price_df = _fetch_prices(ticker, start_date, end_date)
-    except Exception as e:
-        ui.banner("error", f"Price retrieval failed: {e}")
-        st.stop()
+    result = ui.fetch_prices(ticker, start_date, end_date)
 
-if price_df.empty or "adj_close" not in price_df.columns:
-    ui.banner("error", f"No price data for <b>{ticker}</b>. Verify the symbol.")
+if not result.ok or "adj_close" not in result.df.columns:
+    ui.data_unavailable(f"{ticker}: {result.error or 'no usable columns'}")
     st.stop()
+price_df = result.df
+ui.data_asof_caption(result.asof, result.source)
 
 prices = price_df["adj_close"]
 n_days = len(prices) - 1

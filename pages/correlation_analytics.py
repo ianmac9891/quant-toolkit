@@ -9,7 +9,6 @@ import streamlit as st
 
 import ui
 from src import correlation as cr
-from src import data
 from src.theme import PRIMARY, BENCHMARK, NEUTRAL, REFLINE, CHART_CONFIG, apply_chart_theme
 
 ui.page_header(
@@ -55,28 +54,29 @@ if len(tickers) > 25:
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_universe(tickers: tuple[str, ...], start: date, end: date) -> pd.DataFrame:
-    frames = data.get_prices_batch(list(tickers), start, end)
-    cols = {
-        t: df["adj_close"].rename(t)
-        for t, df in frames.items()
-        if not df.empty and "adj_close" in df.columns
-    }
-    return pd.DataFrame(cols).sort_index() if cols else pd.DataFrame()
-
-
 with st.spinner("Retrieving price histories..."):
-    price_df = _fetch_universe(tuple(sorted(tickers)), start_date, end_date)
+    frames = ui.fetch_universe(tuple(sorted(tickers)), start_date, end_date)
+
+cols = {
+    t: df["adj_close"].rename(t)
+    for t, df in frames.items()
+    if not df.empty and "adj_close" in df.columns
+}
+price_df = pd.DataFrame(cols).sort_index() if cols else pd.DataFrame()
 
 failed = sorted(set(tickers) - set(price_df.columns))
 if failed:
     ui.banner("warn", f"No data for: <span class='mono'>{', '.join(failed)}</span> — excluded.")
+if price_df.empty:
+    ui.data_unavailable()
+    st.stop()
 
 price_df = price_df.dropna()
 if price_df.shape[1] < 2 or len(price_df) < 60:
     ui.banner("error", "At least two instruments with 60+ overlapping sessions are required.")
     st.stop()
+
+ui.data_asof_caption(price_df.index.max())
 
 returns_df = price_df.pct_change().dropna()
 active = list(returns_df.columns)

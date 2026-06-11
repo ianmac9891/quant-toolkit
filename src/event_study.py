@@ -64,6 +64,7 @@ class EventResult:
     patell_z: float = float("nan")
     patell_p: float = float("nan")
     scar: float = float("nan")   # standardized CAR (Patell scaling) — BMP input
+    data_through: object = None  # last bar date in the fetched series (provenance)
 
 
 @dataclass
@@ -82,6 +83,7 @@ class MultiEventResult:
     patell_p: float = float("nan")
     bmp_t: float = float("nan")
     bmp_p: float = float("nan")
+    data_through: object = None  # last bar date in the fetched series (provenance)
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
@@ -265,6 +267,7 @@ def run_single_event(
         t_stat=t_stat, p_value=p_value,
         significant=bool(p_value < 0.05) if np.isfinite(p_value) else False,
         patell_z=patell_z, patell_p=patell_p, scar=scar,
+        data_through=ret_t.index.max(),
     )
 
 
@@ -349,4 +352,5 @@ def run_multi_event(
         se_mean_car=se_cs, t_stat=t_cs, p_value=p_cs,
         significant=bool(p_cs < 0.05) if np.isfinite(p_cs) else False,
         patell_z=patell_z, patell_p=patell_p, bmp_t=bmp_t, bmp_p=bmp_p,
+        data_through=ret_t.index.max(),
     )

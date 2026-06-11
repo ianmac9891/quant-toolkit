@@ -10,7 +10,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 import ui
-from src import analysis, data, portfolio as pf, risk
+from src import analysis, portfolio as pf, risk
 from src.theme import (
     PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, REFLINE,
     PRIMARY_10, PRIMARY_18, CHART_CONFIG, apply_chart_theme,
@@ -110,21 +110,21 @@ with ui.panel("Portfolio Definition"):
                               "<span class='mono'>SYMBOL weight</span>, one per line.")
             st.stop()
 
-        @st.cache_data(ttl=3600, show_spinner=False)
-        def _fetch_manual(ticker: str, start: date, end: date) -> pd.Series:
-            df = data.get_prices(ticker, start, end)
-            return df["adj_close"] if not df.empty else pd.Series(dtype=float, name=ticker)
-
         with st.spinner("Retrieving price histories..."):
-            man_series = {t: _fetch_manual(t, man_start, man_end) for t in weights_parsed.index}
+            frames = ui.fetch_universe(tuple(weights_parsed.index), man_start, man_end)
 
-        failed_man = [t for t, s in man_series.items() if s.empty]
+        man_series = {
+            t: df["adj_close"].rename(t)
+            for t, df in frames.items()
+            if not df.empty and "adj_close" in df.columns
+        }
+        failed_man = sorted(set(weights_parsed.index) - set(man_series))
         if failed_man:
             ui.banner("warn", f"No data for: <span class='mono'>{', '.join(failed_man)}</span> — excluded.")
 
-        price_df = pd.DataFrame({t: s for t, s in man_series.items() if not s.empty}).dropna()
+        price_df = pd.DataFrame(man_series).dropna()
         if price_df.empty:
-            ui.banner("error", "No price data available for the entered holdings.")
+            ui.data_unavailable()
             st.stop()
 
         weights = weights_parsed.reindex(price_df.columns).dropna()
@@ -132,6 +132,8 @@ with ui.panel("Portfolio Definition"):
         returns_df = price_df.pct_change().dropna()
         cov = pf.covariance_matrix(returns_df)
         method_used = ""
+
+ui.data_asof_caption(price_df.index.max())
 
 # ── Composition ───────────────────────────────────────────────────────────────
 

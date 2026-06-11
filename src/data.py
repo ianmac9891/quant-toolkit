@@ -25,6 +25,19 @@ Design decisions worth understanding:
 4. Date handling. We strip timezones and work in naive UTC dates. yfinance
    returns tz-aware DatetimeIndex which causes annoying bugs when you try
    to slice it against tz-naive dates from a user input.
+
+5. Cloud resilience. On Streamlit Community Cloud the parquet cache is
+   ephemeral (rebuilt on every container restart) and the container shares
+   one egress IP with other apps, so Yahoo rate-limiting is the dominant
+   production failure mode. Two consequences:
+   - yfinance >= 1.4 with curl_cffi is required: the library manages a
+     shared browser-impersonating session (TLS fingerprint matching Chrome)
+     internally via its YfData singleton. Injecting a plain requests.Session
+     would silently downgrade that, so we never pass one.
+   - fetch_prices() is the typed, never-raising entry point for single-name
+     pulls: retry with backoff, then Alpha Vantage fallback, then a
+     PriceResult carrying the error for the UI to render. Raw tracebacks
+     must not reach a page.
 """
 
 from __future__ import annotations
@@ -32,6 +45,7 @@ from __future__ import annotations
 import os
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -42,6 +56,13 @@ import yfinance as yf
 from dotenv import load_dotenv
 
 load_dotenv()  # pulls .env into os.environ
+
+# One transport-level retry inside yfinance itself (default is 0). Our own
+# retry in fetch_prices() sits above this and adds the provider fallback.
+try:
+    yf.config.network.retries = 1
+except AttributeError:
+    pass  # older yfinance without the config module — our retry still applies
 
 # Cache lives in <project_root>/cache/
 CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
@@ -256,6 +277,55 @@ def get_prices(
 
     # Slice to requested range
     return cached.loc[start_ts:end_ts].copy()
+
+
+@dataclass
+class PriceResult:
+    """Typed outcome of a single-name price fetch. Never carries an exception;
+    pages branch on `ok` and render the data-unavailable banner otherwise."""
+    df: pd.DataFrame
+    source: str                       # "yfinance" | "alphavantage" | "none"
+    asof: Optional[pd.Timestamp]      # last bar date, None when empty
+    error: Optional[str] = None
+
+    @property
+    def ok(self) -> bool:
+        return not self.df.empty
+
+
+def fetch_prices(ticker: str, start: date, end: date) -> PriceResult:
+    """Resilient single-name fetch: yfinance, one retry with backoff, then the
+    Alpha Vantage fallback. Returns a PriceResult; never raises.
+
+    The fallback is deliberately restricted to this single-ticker path. Alpha
+    Vantage's free tier allows 25 requests per day, which a universe scan
+    would exhaust instantly; get_prices_batch() therefore never touches it.
+    """
+    last_error: Optional[str] = None
+
+    for attempt in range(2):
+        try:
+            df = get_prices(ticker, start, end)
+            if not df.empty:
+                return PriceResult(df=df, source="yfinance", asof=df.index.max())
+            last_error = "empty response"
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        if attempt == 0:
+            time.sleep(1.5)
+
+    try:
+        av = AlphaVantageProvider()
+        df = get_prices(ticker, start, end, provider=av)
+        if not df.empty:
+            return PriceResult(df=df, source="alphavantage", asof=df.index.max())
+    except Exception as exc:
+        last_error = f"{last_error}; AV fallback: {type(exc).__name__}"
+
+    return PriceResult(
+        df=pd.DataFrame(), source="none", asof=None,
+        error=last_error or "no data returned",
+    )
 
 
 def clear_cache(ticker: Optional[str] = None) -> int:

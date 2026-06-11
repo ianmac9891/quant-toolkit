@@ -197,6 +197,7 @@ if multi_mode and len(event_dates) > 1:
             ui.banner("error", f"Unexpected error: {e}")
             st.stop()
 
+    ui.data_asof_caption(result.data_through)
     n_events = len(result.per_event)
     ui.kpi_row([
         {"label": "Events Processed", "value": f"{n_events}"},
@@ -262,6 +263,7 @@ else:
             ui.banner("error", f"Unexpected error: {e}")
             st.stop()
 
+    ui.data_asof_caption(result.data_through)
     fit = result.fit
     ui.kpi_row([
         {"label": "Alpha (daily)", "value": f"{fit.alpha*100:.4f}%"},

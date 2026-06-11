@@ -16,6 +16,7 @@ from datetime import date
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src import data as _data
 from src import theme as tk
 
 APP_NAME = "Quant Research Terminal"
@@ -298,6 +299,7 @@ hr {{ border-color: var(--border) !important; margin: 1.6rem 0 !important; }}
 .qrt-banner.warn    {{ border-left-color: var(--accent); }}
 .qrt-banner.error   {{ border-left-color: var(--negative); }}
 .qrt-banner.success {{ border-left-color: var(--positive); }}
+.qrt-banner.data    {{ border-left-color: var(--text-faint); color: var(--text-muted); }}
 .qrt-banner b, .qrt-banner strong {{ font-weight: 600; }}
 .qrt-banner .mono {{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }}
 
@@ -493,8 +495,9 @@ def kpi_row(items: list[dict]) -> None:
 
 
 def banner(kind: str, body: str) -> None:
-    """Status banner. kind: info | warn | error | success. Body may contain
-    <b>/<span class='mono'> markup — caller is responsible for escaping data."""
+    """Status banner. kind: info | warn | error | success | data. Body may contain
+    <b>/<span class='mono'> markup — caller is responsible for escaping data.
+    For provider outages prefer data_unavailable(), which standardizes the copy."""
     st.markdown(f'<div class="qrt-banner {kind}">{body}</div>', unsafe_allow_html=True)
 
 
@@ -530,6 +533,55 @@ def footer_disclaimer() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Data access (Streamlit-side cache over the pure-Python data layer)
+#
+# The in-memory st.cache_data layer lives here rather than in src/data.py so
+# the library stays importable without Streamlit (notebooks, tests, scripts).
+# On Streamlit Cloud the parquet cache is wiped on every container restart;
+# this hourly memory cache is what actually shields Yahoo from rerun traffic.
+# Pages must call these instead of defining their own raw-price cache wrappers.
+# ──────────────────────────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_prices(ticker: str, start: date, end: date) -> _data.PriceResult:
+    """Cached single-name fetch. Returns a typed PriceResult; never raises."""
+    return _data.fetch_prices(ticker, start, end)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_universe(tickers: tuple, start: date, end: date) -> dict:
+    """Cached multi-name fetch via the batch path (never the AV fallback)."""
+    return _data.get_prices_batch(list(tickers), start, end)
+
+
+def data_unavailable(detail: str | None = None) -> None:
+    """The standard banner for provider failures. Keep the message stable so
+    users learn it means 'try again', not 'your input was wrong'."""
+    body = "Market data temporarily unavailable from provider; retry shortly."
+    if detail:
+        body += f" <span class='mono'>({html.escape(detail)})</span>"
+    banner("data", body)
+
+
+def data_asof_caption(asof, source: str = "yfinance") -> None:
+    """Provenance line rendered on every page that shows price-derived output."""
+    source_names = {
+        "yfinance": "Yahoo Finance",
+        "alphavantage": "Alpha Vantage",
+        "none": "no provider",
+    }
+    asof_str = pd_date_str(asof)
+    st.caption(f"Data as of {asof_str} · source: {source_names.get(source, source)}")
+
+
+def pd_date_str(ts) -> str:
+    try:
+        return str(ts.date()) if hasattr(ts, "date") else str(ts)
+    except Exception:
+        return str(ts)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

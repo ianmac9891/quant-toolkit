@@ -171,6 +171,8 @@ if len(price_df) < 252:
     )
     st.stop()
 
+ui.data_asof_caption(price_df.index.max())
+
 active_tickers = tuple(sorted(price_df.columns.tolist()))
 
 with st.spinner(f"Retrieving market capitalizations for {len(active_tickers)} symbols..."):

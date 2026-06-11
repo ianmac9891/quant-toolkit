@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import ui
-from src import data
 from src import estimators as est
 from src import portfolio as pf
 from src.theme import PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL, CHART_CONFIG, apply_chart_theme
@@ -98,24 +97,28 @@ if method != "risk_parity" and weight_cap * len(tickers) < 1.0:
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch(ticker: str, start: date, end: date) -> pd.Series:
-    df = data.get_prices(ticker, start, end)
-    return df["adj_close"] if not df.empty else pd.Series(dtype=float, name=ticker)
-
-
 with st.spinner("Retrieving price histories..."):
-    raw_series = {t: _fetch(t, start_date, end_date) for t in tickers}
+    frames = ui.fetch_universe(tuple(tickers), start_date, end_date)
 
-failed = [t for t, s in raw_series.items() if s.empty]
+raw_series = {
+    t: df["adj_close"].rename(t)
+    for t, df in frames.items()
+    if not df.empty and "adj_close" in df.columns
+}
+failed = sorted(set(tickers) - set(raw_series))
 if failed:
     ui.banner("warn", f"No data for: <span class='mono'>{', '.join(failed)}</span> — excluded.")
+if not raw_series:
+    ui.data_unavailable()
+    st.stop()
 
-price_df = pd.DataFrame({t: s for t, s in raw_series.items() if not s.empty}).dropna()
+price_df = pd.DataFrame(raw_series).dropna()
 
 if price_df.shape[1] < 2:
     ui.banner("error", "At least two instruments with overlapping history are required.")
     st.stop()
+
+ui.data_asof_caption(price_df.index.max())
 
 active_tickers = list(price_df.columns)
 returns_df = price_df.pct_change().dropna()

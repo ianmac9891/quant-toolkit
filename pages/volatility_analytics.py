@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import ui
-from src import data as dt
 from src import volforecast as vf
 from src.theme import (
     PRIMARY, BENCHMARK, NEUTRAL, NEGATIVE, POSITIVE, TEXT,
@@ -80,11 +79,6 @@ fit_end = today
 
 # ── Cached helpers ────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def _fetch(ticker: str, start: date, end: date) -> pd.DataFrame:
-    return dt.get_prices(ticker, start, end)
-
-
 @st.cache_data(ttl=3600, show_spinner=False)
 def _run(prices: pd.Series, horizon: int, drift_annual: float,
          model_type: str, n_sim: int = 10_000) -> vf.VolForecast:
@@ -101,15 +95,13 @@ if not ticker:
     st.stop()
 
 with st.spinner(f"Retrieving {ticker}..."):
-    try:
-        price_df = _fetch(ticker, fit_start, fit_end)
-    except Exception as e:
-        ui.banner("error", f"Price retrieval failed: {e}")
-        st.stop()
+    result = ui.fetch_prices(ticker, fit_start, fit_end)
 
-if price_df.empty or "adj_close" not in price_df.columns:
-    ui.banner("error", f"No price data for <b>{ticker}</b>. Verify the symbol.")
+if not result.ok or "adj_close" not in result.df.columns:
+    ui.data_unavailable(f"{ticker}: {result.error or 'no usable columns'}")
     st.stop()
+price_df = result.df
+ui.data_asof_caption(result.asof, result.source)
 
 prices        = price_df["adj_close"].dropna()
 current_price = float(prices.iloc[-1])

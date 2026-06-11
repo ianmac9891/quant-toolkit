@@ -9,7 +9,6 @@ import streamlit as st
 
 import ui
 from src import options as op
-from src import data as dt
 from src.theme import PRIMARY, BENCHMARK, NEUTRAL, REFLINE, CHART_CONFIG, apply_chart_theme
 
 ui.page_header(
@@ -22,15 +21,13 @@ ui.page_header(
 
 # ── Market parameters ─────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def _latest_close(ticker: str) -> float:
-    try:
-        today = date.today()
-        df = dt.get_prices(ticker, today - timedelta(days=10), today)
-        if not df.empty and "adj_close" in df.columns:
-            return float(df["adj_close"].dropna().iloc[-1])
-    except Exception:
-        pass
+    """Last close via the shared cached fetch; 100.0 placeholder on failure."""
+    res = ui.fetch_prices(ticker, date.today() - timedelta(days=10), date.today())
+    if res.ok and "adj_close" in res.df.columns:
+        series = res.df["adj_close"].dropna()
+        if len(series):
+            return float(series.iloc[-1])
     return 100.0
 
 

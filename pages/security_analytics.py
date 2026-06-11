@@ -63,22 +63,21 @@ if not ticker:
 
 # ── Data ──────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch(ticker: str, start: date, end: date) -> pd.DataFrame:
-    return data.get_prices(ticker, start, end)
-
-
 with st.spinner(f"Retrieving {ticker}..."):
-    df = fetch(ticker, start_date, end_date)
+    result = ui.fetch_prices(ticker, start_date, end_date)
 
-if df.empty:
-    ui.banner("error", f"No price data for <b>{ticker}</b>. Verify the symbol or adjust the observation window.")
+if not result.ok:
+    ui.data_unavailable(f"{ticker}: {result.error}")
     st.stop()
+df = result.df
 
 bench_df = pd.DataFrame()
 if benchmark and benchmark != ticker:
     with st.spinner(f"Retrieving benchmark {benchmark}..."):
-        bench_df = fetch(benchmark, start_date, end_date)
+        bench_result = ui.fetch_prices(benchmark, start_date, end_date)
+        bench_df = bench_result.df
+
+ui.data_asof_caption(result.asof, result.source)
 
 prices = df[price_field].dropna()
 returns = analysis.simple_returns(prices)
