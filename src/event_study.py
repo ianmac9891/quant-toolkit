@@ -231,6 +231,31 @@ def _patell_stats(
     return z, p, scar
 
 
+def _aggregate_patell(z_values: list) -> Tuple[float, float]:
+    """Aggregate per-event Patell Z statistics: each is N(0,1) under the null
+    and independent across events, so the sum scaled by sqrt(N) is again
+    standard normal."""
+    zs = np.array(z_values, dtype=float)
+    zs = zs[np.isfinite(zs)]
+    if len(zs) == 0:
+        return float("nan"), float("nan")
+    z = float(zs.sum() / np.sqrt(len(zs)))
+    return z, float(2 * stats.norm.sf(abs(z)))
+
+
+def _bmp_stats(scars: list) -> Tuple[float, float]:
+    """BMP (1991): cross-sectional t-test on the Patell-scaled SCARs. Using
+    the cross-sectional dispersion of the SCARs makes the test robust to
+    event-induced variance inflation, which the naive and Patell tests
+    assume away."""
+    arr = np.array(scars, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) < 2 or arr.std(ddof=1) <= 0:
+        return float("nan"), float("nan")
+    t = float(arr.mean() / (arr.std(ddof=1) / np.sqrt(len(arr))))
+    return t, float(2 * stats.t.sf(abs(t), df=len(arr) - 1))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def run_single_event(
@@ -326,24 +351,8 @@ def run_multi_event(
     t_cs  = float(cars.mean() / se_cs) if np.isfinite(se_cs) and se_cs > 0 else np.nan
     p_cs  = float(2 * stats.t.sf(abs(t_cs), df=n - 1)) if np.isfinite(t_cs) else np.nan
 
-    # Aggregated Patell Z: sum of per-event Z components, scaled by sqrt(N)
-    zs = np.array([e.patell_z for e in per_event])
-    zs = zs[np.isfinite(zs)]
-    if len(zs) > 0:
-        patell_z = float(zs.sum() / np.sqrt(len(zs)))
-        patell_p = float(2 * stats.norm.sf(abs(patell_z)))
-    else:
-        patell_z, patell_p = np.nan, np.nan
-
-    # BMP: cross-sectional t-test on the Patell-scaled SCARs — robust to
-    # event-induced variance inflation.
-    scars = np.array([e.scar for e in per_event])
-    scars = scars[np.isfinite(scars)]
-    if len(scars) > 1 and scars.std(ddof=1) > 0:
-        bmp_t = float(scars.mean() / (scars.std(ddof=1) / np.sqrt(len(scars))))
-        bmp_p = float(2 * stats.t.sf(abs(bmp_t), df=len(scars) - 1))
-    else:
-        bmp_t, bmp_p = np.nan, np.nan
+    patell_z, patell_p = _aggregate_patell([e.patell_z for e in per_event])
+    bmp_t, bmp_p = _bmp_stats([e.scar for e in per_event])
 
     return MultiEventResult(
         ticker=ticker, benchmark=benchmark,
