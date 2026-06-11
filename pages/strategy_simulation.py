@@ -366,6 +366,41 @@ with ui.panel("Performance — Estimation vs Validation"):
                 "generalize beyond the fitted period.",
             )
 
+# ── Calendar-year returns ─────────────────────────────────────────────────────
+
+def _yearly_returns(equity: pd.Series) -> pd.Series:
+    rets = equity.pct_change().dropna()
+    if rets.empty:
+        return pd.Series(dtype=float)
+    return (1 + rets).groupby(rets.index.year).prod() - 1
+
+
+with ui.panel("Calendar-Year Returns"):
+    yr_cols = {
+        STRATEGY_LABELS[strategy_key]: _yearly_returns(result.equity.loc[first_active:]),
+        "Equal Weight": _yearly_returns(ew_result.equity.loc[first_active:]),
+    }
+    if spy_series is not None:
+        yr_cols["S&P 500 (SPY)"] = _yearly_returns(spy_series.loc[first_active:])
+
+    yr_df = pd.DataFrame(yr_cols)
+    if yr_df.empty:
+        ui.banner("info", "Not enough history for calendar-year statistics.")
+    else:
+        yr_df.index.name = "Year"
+        disp_yr = (yr_df * 100).round(1)
+        st.dataframe(
+            disp_yr,
+            column_config={
+                c: st.column_config.NumberColumn(c, format="%.1f%%") for c in disp_yr.columns
+            },
+            width="stretch",
+        )
+        st.caption(
+            "Partial first and last years cover only the simulated portion of the "
+            "calendar year. The warm-up period is excluded."
+        )
+
 # ── Ledger and weights ────────────────────────────────────────────────────────
 
 n_trades = len(result.trade_log)

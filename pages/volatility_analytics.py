@@ -258,6 +258,34 @@ with ui.panel("Volatility Regime"):
         f"Current regime: {ui.tag(regime_text.upper(), regime_kind)}",
         unsafe_allow_html=True,
     )
+
+    cv = fit.cond_vol_series.dropna()
+    regime_fig = go.Figure()
+    regime_fig.add_trace(go.Scatter(
+        x=cv.index, y=cv.values * 100, mode="lines",
+        line=dict(color=PRIMARY, width=1.3), name="Conditional volatility",
+    ))
+    regime_fig.add_hline(
+        y=fit.longrun_ann_vol * 100, line_dash="dash", line_color=NEUTRAL, line_width=1.2,
+        annotation_text=f"Long-run {fit.longrun_ann_vol:.1%}",
+        annotation_position="top left", annotation_font_size=11,
+    )
+    regime_fig.add_trace(go.Scatter(
+        x=[cv.index[-1]], y=[fit.current_ann_vol * 100],
+        mode="markers", marker=dict(size=9, color=BENCHMARK, symbol="diamond"),
+        name="Current",
+    ))
+    regime_fig.update_layout(
+        yaxis_title="Annualized volatility (%)",
+        height=260, margin=dict(l=10, r=10, t=10, b=10),
+        showlegend=False, hovermode="x unified",
+    )
+    apply_chart_theme(regime_fig)
+    st.plotly_chart(regime_fig, width="stretch", config=CHART_CONFIG)
+    st.caption(
+        "In-sample conditional volatility from the fitted model. The regime "
+        "percentile locates the current level within this history."
+    )
     if fit.vol_regime == "elevated":
         st.caption(
             "Elevated conditional volatility implies relatively expensive option "

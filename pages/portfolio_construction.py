@@ -325,6 +325,40 @@ with ui.panel("Efficient Frontier"):
     apply_chart_theme(ef_fig)
     st.plotly_chart(ef_fig, width="stretch", config=CHART_CONFIG)
 
+# ── In-sample performance ─────────────────────────────────────────────────────
+
+with ui.panel("In-Sample Performance — Target Allocation vs Equal Weight"):
+    w_aligned = opt_result.weights.reindex(returns_df.columns).fillna(0.0)
+    port_rets = returns_df @ w_aligned.values
+    ew_rets   = returns_df.mean(axis=1)
+
+    wealth_opt = (1 + port_rets).cumprod()
+    wealth_ew  = (1 + ew_rets).cumprod()
+
+    perf_fig = go.Figure()
+    perf_fig.add_trace(go.Scatter(
+        x=wealth_opt.index, y=wealth_opt.values, mode="lines",
+        name="Target allocation", line=dict(color=PRIMARY, width=2),
+    ))
+    perf_fig.add_trace(go.Scatter(
+        x=wealth_ew.index, y=wealth_ew.values, mode="lines",
+        name="Equal weight", line=dict(color=POSITIVE, width=1.5, dash="dash"),
+    ))
+    perf_fig.update_layout(
+        yaxis_title="Growth of $1 (log)", yaxis_type="log",
+        height=320, margin=dict(l=10, r=10, t=10, b=10),
+        hovermode="x unified", legend=dict(x=0.02, y=0.98),
+    )
+    apply_chart_theme(perf_fig)
+    st.plotly_chart(perf_fig, width="stretch", config=CHART_CONFIG)
+    st.caption(
+        "Realized growth of $1 holding the target weights with daily rebalancing, "
+        "gross of transaction costs, over the same window the weights were "
+        "estimated on. This is an in-sample illustration, not a forecast — for "
+        "out-of-sample evidence use Strategy Simulation's walk-forward optimizer, "
+        "which re-fits the allocation at each rebalance."
+    )
+
 ui.banner(
     "info",
     "The target allocation has been staged for the <b>Risk Analytics</b> tool — "

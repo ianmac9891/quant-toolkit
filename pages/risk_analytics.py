@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
 
 import ui
-from src import data, portfolio as pf, risk
+from src import analysis, data, portfolio as pf, risk
 from src.theme import (
     PRIMARY, BENCHMARK, POSITIVE, NEGATIVE, NEUTRAL,
     PRIMARY_10, PRIMARY_18, CHART_CONFIG, apply_chart_theme,
@@ -185,6 +186,54 @@ if "risk_parity" in method_used:
         "Risk-parity allocations equalize risk contribution by construction; "
         "material divergence between the two charts would indicate a solver issue.",
     )
+
+# ── Historical performance ────────────────────────────────────────────────────
+
+hist_rets = (returns_df.reindex(columns=weights.index).fillna(0.0) @ weights.values)
+hist_rets = pd.Series(hist_rets, index=returns_df.index).dropna()
+
+if len(hist_rets) > 60:
+    dd_res = analysis.drawdown(hist_rets)
+    wealth_hist = analysis.cumulative_returns(hist_rets)
+
+    ui.kpi_row([
+        {"label": "Annualized Return", "value": f"{analysis.annualized_return(hist_rets) * 100:.2f}%"},
+        {"label": "Annualized Volatility", "value": f"{analysis.annualized_volatility(hist_rets) * 100:.2f}%"},
+        {"label": "Maximum Drawdown", "value": f"{dd_res.max_drawdown * 100:.1f}%",
+         "delta_kind": "neg"},
+        {"label": "Worst Day", "value": f"{hist_rets.min() * 100:.2f}%", "delta_kind": "neg"},
+        {"label": "Best Day", "value": f"{hist_rets.max() * 100:+.2f}%", "delta_kind": "pos"},
+    ])
+
+    with ui.panel("Historical Portfolio Performance (current weights, daily rebalanced)"):
+        hp_fig = make_subplots(
+            rows=2, cols=1, shared_xaxes=True,
+            row_heights=[0.65, 0.35], vertical_spacing=0.05,
+            subplot_titles=("Growth of $1", "Drawdown"),
+        )
+        hp_fig.add_trace(go.Scatter(
+            x=wealth_hist.index, y=wealth_hist.values, name="Portfolio",
+            line=dict(color=PRIMARY, width=1.5),
+        ), row=1, col=1)
+        hp_fig.add_trace(go.Scatter(
+            x=dd_res.series.index, y=dd_res.series.values * 100,
+            name="Drawdown %", fill="tozeroy", fillcolor=PRIMARY_10,
+            line=dict(color=PRIMARY, width=0.5),
+        ), row=2, col=1)
+        hp_fig.update_layout(
+            height=400, margin=dict(l=10, r=10, t=40, b=10),
+            hovermode="x unified", showlegend=False,
+        )
+        hp_fig.update_yaxes(title_text="$", row=1, col=1)
+        hp_fig.update_yaxes(title_text="%", row=2, col=1)
+        apply_chart_theme(hp_fig)
+        st.plotly_chart(hp_fig, width="stretch", config=CHART_CONFIG)
+        st.caption(
+            f"Maximum drawdown {dd_res.max_drawdown * 100:.1f}%: peak "
+            f"{dd_res.peak_date.date()}, trough {dd_res.trough_date.date()}. "
+            "Applies today's weights to the full return history with daily "
+            "rebalancing and no transaction costs."
+        )
 
 # ── Value at Risk ─────────────────────────────────────────────────────────────
 

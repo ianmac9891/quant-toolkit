@@ -64,54 +64,88 @@ _WIKI_UA = {"User-Agent": "Mozilla/5.0 (compatible; quantworkbench/1.0)"}
 
 # ── Universe helpers ──────────────────────────────────────────────────────────
 
-def _fetch_sp_index_tickers(url: str) -> list[str]:
+_SP_INDEX_URLS = {
+    "sp500": "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+    "sp400": "https://en.wikipedia.org/wiki/List_of_S%26P_400_companies",
+    "sp600": "https://en.wikipedia.org/wiki/List_of_S%26P_600_companies",
+}
+
+
+def _fetch_sp_index_constituents(url: str) -> pd.Series:
     """
-    Shared Wikipedia scraper.  Tries several common ticker column names.
+    Shared Wikipedia scraper. Returns Series(sector, index=ticker) — the GICS
+    sector ships in the same constituents table, so it costs nothing extra.
     Uses requests + User-Agent to avoid Wikipedia's 403 on urllib's default agent.
     """
     resp = requests.get(url, headers=_WIKI_UA, timeout=15)
     resp.raise_for_status()
     df = pd.read_html(io.StringIO(resp.text))[0]
-    for col in ("Symbol", "Ticker", "Ticker symbol"):
-        if col in df.columns:
-            return sorted(t.replace(".", "-") for t in df[col].dropna().tolist())
-    raise ValueError(f"Could not find a ticker column in {url}. Columns: {df.columns.tolist()}")
+
+    sym_col = next((c for c in ("Symbol", "Ticker", "Ticker symbol") if c in df.columns), None)
+    if sym_col is None:
+        raise ValueError(f"Could not find a ticker column in {url}. Columns: {df.columns.tolist()}")
+    sector_col = next((c for c in df.columns if "gics sector" in str(c).lower()), None)
+
+    tickers = df[sym_col].dropna().astype(str).str.replace(".", "-", regex=False)
+    sectors = (
+        df.loc[tickers.index, sector_col].astype(str)
+        if sector_col is not None
+        else pd.Series("", index=tickers.index)
+    )
+    out = pd.Series(sectors.values, index=tickers.values, name="sector")
+    return out[~out.index.duplicated()].sort_index()
+
+
+def fetch_sp500_constituents() -> pd.Series:
+    """S&P 500: Series(GICS sector, index=ticker)."""
+    return _fetch_sp_index_constituents(_SP_INDEX_URLS["sp500"])
+
+
+def fetch_sp400_constituents() -> pd.Series:
+    """S&P 400 MidCap: Series(GICS sector, index=ticker)."""
+    return _fetch_sp_index_constituents(_SP_INDEX_URLS["sp400"])
+
+
+def fetch_sp600_constituents() -> pd.Series:
+    """S&P 600 SmallCap: Series(GICS sector, index=ticker)."""
+    return _fetch_sp_index_constituents(_SP_INDEX_URLS["sp600"])
+
+
+def fetch_sp1500_constituents() -> pd.Series:
+    """
+    S&P 500 + 400 + 600 combined (deduplicated): Series(GICS sector, index=ticker).
+    Partial scrape failures are tolerated — whatever was retrieved is returned.
+    """
+    parts = []
+    for fn in (fetch_sp500_constituents, fetch_sp400_constituents, fetch_sp600_constituents):
+        try:
+            parts.append(fn())
+        except Exception:
+            pass
+    if not parts:
+        return pd.Series(dtype=object, name="sector")
+    combined = pd.concat(parts)
+    return combined[~combined.index.duplicated()].sort_index()
 
 
 def fetch_sp500_tickers() -> list[str]:
     """Current S&P 500 constituents from Wikipedia."""
-    return _fetch_sp_index_tickers(
-        "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    )
+    return fetch_sp500_constituents().index.tolist()
 
 
 def fetch_sp400_tickers() -> list[str]:
     """Current S&P 400 MidCap constituents from Wikipedia."""
-    return _fetch_sp_index_tickers(
-        "https://en.wikipedia.org/wiki/List_of_S%26P_400_companies"
-    )
+    return fetch_sp400_constituents().index.tolist()
 
 
 def fetch_sp600_tickers() -> list[str]:
     """Current S&P 600 SmallCap constituents from Wikipedia."""
-    return _fetch_sp_index_tickers(
-        "https://en.wikipedia.org/wiki/List_of_S%26P_600_companies"
-    )
+    return fetch_sp600_constituents().index.tolist()
 
 
 def fetch_sp1500_tickers() -> list[str]:
-    """
-    S&P 500 + S&P 400 MidCap + S&P 600 SmallCap (deduplicated).
-    Virtually all names have liquid listed options.
-    Scanning ~1500 tickers takes longer than the 500-ticker preset.
-    """
-    combined: set[str] = set()
-    for fn in (fetch_sp500_tickers, fetch_sp400_tickers, fetch_sp600_tickers):
-        try:
-            combined.update(fn())
-        except Exception:
-            pass   # partial failure — still return whatever we got
-    return sorted(combined)
+    """S&P 500 + S&P 400 MidCap + S&P 600 SmallCap (deduplicated)."""
+    return fetch_sp1500_constituents().index.tolist()
 
 
 # ── Price download ────────────────────────────────────────────────────────────

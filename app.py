@@ -30,9 +30,11 @@ pg = st.navigation(
         st.Page("pages/portfolio_construction.py", title="Portfolio Construction", url_path="portfolio-construction"),
         st.Page("pages/risk_analytics.py",          title="Risk Analytics",         url_path="risk-analytics"),
         st.Page("pages/strategy_simulation.py",     title="Strategy Simulation",    url_path="strategy-simulation"),
+        st.Page("pages/correlation_analytics.py",   title="Correlation Analytics",  url_path="correlation-analytics"),
         # Systematic Research
         st.Page("pages/equity_screening.py",      title="Equity Screening",      url_path="equity-screening"),
         st.Page("pages/seasonality_research.py",  title="Seasonality Research",  url_path="seasonality-research"),
+        st.Page("pages/relative_value.py",        title="Relative Value Analysis", url_path="relative-value"),
     ],
     position="hidden",
 )

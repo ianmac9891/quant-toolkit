@@ -182,6 +182,39 @@ def _cache_path(ticker: str, provider_name: str) -> Path:
     return CACHE_DIR / f"{provider_name}_{ticker.upper().replace('/', '_')}.parquet"
 
 
+def _effective_end(end: date) -> pd.Timestamp:
+    """Clamp a requested end date to the last completed business day.
+
+    Without this, a cache that ends on Friday looks stale all weekend (and a
+    cache that ends yesterday looks stale before today's close exists), so
+    every ticker re-hits the network on every run — which is what rate-limits
+    large universe scans.
+    """
+    ts = pd.Timestamp(end)
+    bdays = pd.bdate_range(end=ts, periods=2)
+    last_bday = bdays[-1] if bdays[-1] <= ts else bdays[0]
+    # Data for the current business day is not reliably published until the
+    # session completes; accept a cache that ends on the prior business day.
+    if last_bday == pd.Timestamp(date.today()):
+        last_bday = pd.bdate_range(end=last_bday, periods=2)[0]
+    return last_bday
+
+
+def _cache_is_stale(cached: pd.DataFrame, start: date, end: date) -> bool:
+    """True if the cached frame does not cover [start, end] in business-day terms.
+
+    The start comparison is clamped forward to the first business day at or
+    after `start` (a Saturday start would otherwise never be 'covered').
+    """
+    if cached.empty:
+        return True
+    start_eff = pd.bdate_range(start=pd.Timestamp(start), periods=1)[0]
+    return bool(
+        cached.index.min() > start_eff
+        or cached.index.max() < _effective_end(end)
+    )
+
+
 def get_prices(
     ticker: str,
     start: date,
@@ -206,11 +239,7 @@ def get_prices(
     start_ts = pd.Timestamp(start)
     end_ts = pd.Timestamp(end)
 
-    needs_fetch = (
-        cached.empty
-        or cached.index.min() > start_ts
-        or cached.index.max() < end_ts
-    )
+    needs_fetch = _cache_is_stale(cached, start, end)
 
     if needs_fetch:
         # Fetch a generous range (the full window) and merge.
@@ -237,3 +266,116 @@ def clear_cache(ticker: Optional[str] = None) -> int:
             f.unlink()
             count += 1
     return count
+
+
+# -------------------------------------------------------------------------
+# Batch access (large universes)
+# -------------------------------------------------------------------------
+
+_OHLCV_COLS = ["open", "high", "low", "close", "adj_close", "volume"]
+
+_YF_RENAME = {
+    "Open": "open", "High": "high", "Low": "low",
+    "Close": "close", "Adj Close": "adj_close", "Volume": "volume",
+}
+
+
+def _normalize_yf_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename/clean one ticker's slice of a yf.download result to cache schema."""
+    df = df.rename(columns=_YF_RENAME)
+    df = df[[c for c in _OHLCV_COLS if c in df.columns]].dropna(how="all")
+    if df.empty:
+        return pd.DataFrame()
+    df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
+    df.index.name = "date"
+    return df
+
+
+def get_prices_batch(
+    tickers: list[str],
+    start: date,
+    end: date,
+    chunk_size: int = 100,
+    progress_cb: Optional[callable] = None,
+) -> dict[str, pd.DataFrame]:
+    """
+    Fetch OHLCV for many tickers at once. Returns {ticker: DataFrame}; an
+    empty DataFrame marks a retrieval failure.
+
+    Per-ticker downloads rate-limit at universe scale (hundreds of concurrent
+    single-name requests), which is how large scans lose names. This path:
+      1. serves every ticker whose parquet cache already covers [start, end]
+         (business-day clamped) with zero network calls;
+      2. batch-downloads only the stale/missing names via chunked
+         yf.download(group_by="ticker") — one request per ~chunk_size names;
+      3. merges fresh rows into each per-ticker parquet so the single-name
+         get_prices() path benefits too.
+
+    progress_cb, if given, is called as progress_cb(done, total) after the
+    cache pass and after each chunk.
+    """
+    tickers = [t.upper() for t in tickers]
+    start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
+
+    out: dict[str, pd.DataFrame] = {}
+    cached_frames: dict[str, pd.DataFrame] = {}
+    to_fetch: list[str] = []
+
+    for t in tickers:
+        cache_file = _cache_path(t, "yfinance")
+        cached = pd.read_parquet(cache_file) if cache_file.exists() else pd.DataFrame()
+        cached_frames[t] = cached
+        if _cache_is_stale(cached, start, end):
+            to_fetch.append(t)
+        else:
+            out[t] = cached.loc[start_ts:end_ts].copy()
+
+    total = len(tickers)
+    if progress_cb:
+        progress_cb(len(out), total)
+
+    for i in range(0, len(to_fetch), chunk_size):
+        chunk = to_fetch[i : i + chunk_size]
+        try:
+            raw = yf.download(
+                chunk,
+                start=start.isoformat(),
+                end=(end + timedelta(days=1)).isoformat(),
+                progress=False,
+                auto_adjust=False,
+                actions=False,
+                group_by="ticker",
+                threads=True,
+            )
+        except Exception:
+            raw = pd.DataFrame()
+
+        for t in chunk:
+            fetched = pd.DataFrame()
+            if not raw.empty:
+                try:
+                    if isinstance(raw.columns, pd.MultiIndex):
+                        if t in raw.columns.get_level_values(0):
+                            fetched = _normalize_yf_frame(raw[t])
+                    elif len(chunk) == 1:
+                        fetched = _normalize_yf_frame(raw)
+                except Exception:
+                    fetched = pd.DataFrame()
+
+            cached = cached_frames[t]
+            if not fetched.empty:
+                combined = pd.concat([cached, fetched])
+                combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+                combined.to_parquet(_cache_path(t, "yfinance"))
+                out[t] = combined.loc[start_ts:end_ts].copy()
+            elif not cached.empty:
+                # Network miss but the cache has usable (possibly stale) data —
+                # serve it rather than dropping the name from the universe.
+                out[t] = cached.loc[start_ts:end_ts].copy()
+            else:
+                out[t] = pd.DataFrame()
+
+        if progress_cb:
+            progress_cb(min(len(out), total), total)
+
+    return out

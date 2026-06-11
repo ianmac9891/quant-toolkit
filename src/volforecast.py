@@ -51,6 +51,10 @@ class GarchFit:
     # Bootstrap inputs — standardized residuals from the fitted model
     std_resid: np.ndarray       # shape (T,); resampled for simulation
 
+    # In-sample conditional volatility, annualized decimal, indexed by date —
+    # used by the UI to show the regime in historical context
+    cond_vol_series: pd.Series
+
 
 @dataclass
 class VolForecast:
@@ -137,6 +141,9 @@ def fit_garch(prices: pd.Series, model_type: str = "garch") -> GarchFit:
 
     # Vol regime: percentile of current vol in the full conditional-vol history
     cond_ann_vols = result.conditional_volatility.values / _PCT * np.sqrt(TRADING_DAYS)
+    cond_vol_series = pd.Series(
+        cond_ann_vols, index=result.conditional_volatility.index, name="cond_vol_ann",
+    )
     vol_pct       = float((cond_ann_vols < current_ann_vol).mean())
     if   vol_pct > 0.75: regime = "elevated"
     elif vol_pct < 0.25: regime = "compressed"
@@ -158,6 +165,7 @@ def fit_garch(prices: pd.Series, model_type: str = "garch") -> GarchFit:
         aic=float(result.aic),
         loglikelihood=float(result.loglikelihood),
         std_resid=std_resid,
+        cond_vol_series=cond_vol_series,
     )
 
 

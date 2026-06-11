@@ -1,6 +1,5 @@
 """Equity Screening — cross-sectional momentum and trend-quality ranking."""
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
 import numpy as np
@@ -9,6 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import ui
+from src import data
 from src import screener as sc
 from src.theme import CHART_CONFIG, apply_chart_theme
 
@@ -80,12 +80,12 @@ tickers_input = (
 # ── Cached helpers ────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def _sp500_tickers() -> list[str]:
-    return sc.fetch_sp500_tickers()
+def _sp500_constituents() -> pd.Series:
+    return sc.fetch_sp500_constituents()
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def _sp1500_tickers() -> list[str]:
-    return sc.fetch_sp1500_tickers()
+def _sp1500_constituents() -> pd.Series:
+    return sc.fetch_sp1500_constituents()
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def _market_caps(tickers: tuple[str, ...]) -> pd.Series:
@@ -101,14 +101,23 @@ def _screen(prices: pd.DataFrame, market_caps: pd.Series, rev_growth: pd.Series,
     return sc.run_screen(prices, market_caps, rev_growth, min_mcap)
 
 
-# ── Resolve universe ──────────────────────────────────────────────────────────
+# ── Resolve universe and sector map ───────────────────────────────────────────
 
+sector_map = pd.Series(dtype=object)
 if universe_mode.startswith("S&P 500"):
     with st.spinner("Loading S&P 500 constituents..."):
-        tickers_input = _sp500_tickers()
+        sector_map = _sp500_constituents()
+    tickers_input = sector_map.index.tolist()
 elif universe_mode.startswith("S&P 1500"):
     with st.spinner("Loading S&P 1500 constituents..."):
-        tickers_input = _sp1500_tickers()
+        sector_map = _sp1500_constituents()
+    tickers_input = sector_map.index.tolist()
+else:
+    # Custom watchlist: best-effort sector lookup from the cached S&P 1500 map
+    try:
+        sector_map = _sp1500_constituents()
+    except Exception:
+        sector_map = pd.Series(dtype=object)
 
 if not tickers_input:
     ui.banner("warn", "Specify at least one symbol.")
@@ -117,46 +126,29 @@ if not tickers_input:
 tickers_key = tuple(sorted(tickers_input))
 n_requested = len(tickers_key)
 
-# ── Price retrieval with progress ─────────────────────────────────────────────
+# ── Price retrieval (batched; cache-covered names skip the network) ──────────
 
 prices_cache_key = (tickers_key, str(start_date), str(end_date))
 needs_fetch = st.session_state.get("_prices_key") != prices_cache_key
 
 if needs_fetch:
     n = n_requested
-    est_minutes = max(1, round(n * 0.25 / 60, 1))
-    ui.banner(
-        "info",
-        f"Retrieving and caching price data for <b>{n}</b> symbols "
-        f"(approximately {est_minutes} min on first run). Subsequent runs in "
-        "this session are immediate; new sessions read the local Parquet cache "
-        "in roughly ten seconds.",
-    )
-
     prog = st.progress(0.0, text=f"Retrieving prices: 0 / {n}")
-    price_dict: dict[str, pd.Series] = {}
-    dl_failed:  list[str]            = []
-    done = 0
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {
-            ex.submit(sc.fetch_ticker_prices, t, start_date, end_date, 3): t
-            for t in tickers_key
-        }
-        for fut in as_completed(futures):
-            t = futures[fut]
-            done += 1
-            prog.progress(done / n, text=f"Retrieving prices: {done} / {n}  ({t})")
-            try:
-                series = fut.result()
-                if not series.empty:
-                    price_dict[t] = series
-                else:
-                    dl_failed.append(t)
-            except Exception:
-                dl_failed.append(t)
-
+    frames = data.get_prices_batch(
+        list(tickers_key), start_date, end_date,
+        progress_cb=lambda done, total: prog.progress(
+            min(done / total, 1.0), text=f"Retrieving prices: {done} / {total}"
+        ),
+    )
     prog.empty()
+
+    price_dict = {
+        t: df["adj_close"].rename(t)
+        for t, df in frames.items()
+        if not df.empty and "adj_close" in df.columns
+    }
+    dl_failed = sorted(set(tickers_key) - set(price_dict))
 
     price_df = pd.DataFrame(price_dict).sort_index() if price_dict else pd.DataFrame()
 
@@ -194,6 +186,24 @@ if max_extension < 5.0:
     mask = ranked["extension_z"].isna() | (ranked["extension_z"] <= max_extension)
     ranked = ranked[mask]
 
+# Attach GICS sectors (free — same Wikipedia table as the constituents)
+if not sector_map.empty:
+    ranked = ranked.copy()
+    ranked["sector"] = sector_map.reindex(ranked.index).fillna("—")
+
+# Sector filter: a post-ranking slice, so changing it never re-runs the scan
+sectors_present = (
+    sorted(s for s in ranked.get("sector", pd.Series(dtype=object)).unique() if s and s != "—")
+    if "sector" in ranked.columns else []
+)
+if sectors_present:
+    sel_sectors = st.multiselect(
+        "Sector Filter (GICS)", options=sectors_present, default=[],
+        help="Restrict the ranking to selected sectors. Leave empty for all sectors.",
+    )
+    if sel_sectors:
+        ranked = ranked[ranked["sector"].isin(sel_sectors)]
+
 # ── Coverage summary ──────────────────────────────────────────────────────────
 
 ui.kpi_row([
@@ -211,7 +221,7 @@ with ui.panel("Composite Ranking"):
         ui.banner("info", "No symbols passed all constraints with sufficient history.")
     else:
         display_cols = [
-            "composite",
+            "composite", "sector",
             "extension_z", "extension_flag",
             "mom_12_1", "mom_6m",
             "pct_above_200sma", "golden_cross", "dist_52w_high",
@@ -231,6 +241,7 @@ with ui.panel("Composite Ranking"):
 
         col_cfg = {
             "composite":        st.column_config.NumberColumn("Composite Score", format="%.2f"),
+            "sector":           st.column_config.TextColumn("GICS Sector"),
             "extension_z":      st.column_config.NumberColumn("Extension (sd)", format="%.2f",
                                     help="Standard deviations above the symbol's own "
                                          "252-session regression trendline"),
@@ -256,7 +267,7 @@ with ui.panel("Composite Ranking"):
             height=520,
         )
 
-        csv = ranked[display_cols].reset_index().to_csv(index=False)
+        csv = ranked[[c for c in display_cols if c in ranked.columns]].reset_index().to_csv(index=False)
         st.download_button("Export Full Results (CSV)", csv,
                            file_name="screen_results.csv", mime="text/csv")
 

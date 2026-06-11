@@ -161,6 +161,84 @@ with ui.panel("Cumulative Return and Drawdown"):
         f"peak {dd.peak_date.date()}, trough {dd.trough_date.date()}."
     )
 
+# ── Benchmark regression ──────────────────────────────────────────────────────
+
+if len(bench_returns):
+    joint = pd.concat([returns.rename("asset"), bench_returns.rename("bench")],
+                      axis=1, join="inner").dropna()
+    if len(joint) > 60:
+        b_var = float(joint["bench"].var(ddof=1))
+        beta = float(joint["asset"].cov(joint["bench"]) / b_var) if b_var > 0 else float("nan")
+        alpha_ann = float((joint["asset"].mean() - beta * joint["bench"].mean())
+                          * analysis.TRADING_DAYS)
+        corr = float(joint["asset"].corr(joint["bench"]))
+
+        up = joint[joint["bench"] > 0]
+        down = joint[joint["bench"] < 0]
+        up_capture = (float(up["asset"].mean() / up["bench"].mean())
+                      if len(up) and up["bench"].mean() != 0 else float("nan"))
+        down_capture = (float(down["asset"].mean() / down["bench"].mean())
+                        if len(down) and down["bench"].mean() != 0 else float("nan"))
+        tracking_err = float((joint["asset"] - joint["bench"]).std(ddof=1)
+                             * np.sqrt(analysis.TRADING_DAYS))
+
+        with ui.panel(f"Benchmark Regression vs {benchmark} — {len(joint):,} sessions"):
+            ui.kpi_row([
+                {"label": "Beta", "value": f"{beta:.2f}"},
+                {"label": "Alpha (annualized)", "value": f"{alpha_ann * 100:+.2f}%",
+                 "delta_kind": "pos" if alpha_ann >= 0 else "neg"},
+                {"label": "Correlation", "value": f"{corr:.2f}"},
+                {"label": "Upside Capture", "value": f"{up_capture * 100:.0f}%"},
+                {"label": "Downside Capture", "value": f"{down_capture * 100:.0f}%"},
+                {"label": "Tracking Error", "value": f"{tracking_err * 100:.1f}%"},
+            ])
+            st.caption(
+                "Daily OLS against the benchmark over the common sample. Upside and "
+                "downside capture compare the instrument's average return on benchmark "
+                "up and down days; values above 100% on the downside indicate the "
+                "instrument loses more than the benchmark when the benchmark falls."
+            )
+
+# ── Monthly return profile ────────────────────────────────────────────────────
+
+monthly = (1 + returns).resample("ME").prod() - 1
+if len(monthly) >= 6:
+    mdf = pd.DataFrame({
+        "year": monthly.index.year,
+        "month": monthly.index.month,
+        "ret": monthly.values * 100,
+    })
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    grid = mdf.pivot(index="year", columns="month", values="ret").reindex(
+        columns=range(1, 13))
+    yearly = ((1 + monthly).groupby(monthly.index.year).prod() - 1) * 100
+    grid["Year"] = yearly
+
+    z = grid.values
+    zmax = float(np.nanmax(np.abs(z))) or 1.0
+    with ui.panel("Monthly Return Profile (%)"):
+        heat = go.Figure(go.Heatmap(
+            z=z,
+            x=month_names + ["Year"],
+            y=[str(y) for y in grid.index],
+            zmin=-zmax, zmax=zmax,
+            colorscale=[[0.0, "#7f1d1d"], [0.45, "#11141B"],
+                        [0.55, "#11141B"], [1.0, "#14532d"]],
+            text=np.where(np.isnan(z), "", np.vectorize(lambda v: f"{v:+.1f}")(np.nan_to_num(z))),
+            texttemplate="%{text}",
+            textfont=dict(size=10),
+            hovertemplate="%{y} %{x}: %{z:.2f}%<extra></extra>",
+            showscale=False,
+        ))
+        heat.update_layout(
+            height=max(220, 28 * len(grid) + 60),
+            margin=dict(l=10, r=10, t=10, b=10),
+            yaxis=dict(autorange="reversed"),
+        )
+        apply_chart_theme(heat)
+        st.plotly_chart(heat, width="stretch", config=CHART_CONFIG)
+
 # ── Risk and performance summary ──────────────────────────────────────────────
 
 col_l, col_r = st.columns([1, 1])

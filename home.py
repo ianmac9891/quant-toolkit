@@ -58,7 +58,7 @@ with c2:
 # ── Portfolio & Risk ──────────────────────────────────────────────────────────
 
 ui.section("Portfolio & Risk")
-c3, c4, c5 = st.columns(3)
+c3, c4 = st.columns(2)
 with c3:
     st.html(ui.nav_card(
         "portfolio-construction", "Portfolio Construction",
@@ -67,42 +67,56 @@ with c3:
         ["Maximum Sharpe / minimum variance", "Risk parity", "Ledoit-Wolf and OAS shrinkage",
          "Michaud resampling"],
     ))
-with c4:
-    st.html(ui.nav_card(
-        "risk-analytics", "Risk Analytics",
-        "Value at Risk and expected shortfall, forward wealth simulation, "
-        "Fama-French factor exposure, and historical stress replay.",
-        ["VaR / CVaR at 95% and 99%", "Monte Carlo wealth paths", "FF3 factor regression",
-         "Stress scenarios"],
-    ))
-with c5:
     st.html(ui.nav_card(
         "strategy-simulation", "Strategy Simulation",
         "Historical simulation of allocation strategies with transaction costs, "
         "no-lookahead discipline, and estimation/validation segmentation.",
         ["Momentum and trend strategies", "Walk-forward optimization",
-         "Estimation vs validation statistics", "Rebalance ledger"],
+         "Estimation vs validation statistics", "Calendar-year returns"],
+    ))
+with c4:
+    st.html(ui.nav_card(
+        "risk-analytics", "Risk Analytics",
+        "Value at Risk and expected shortfall, forward wealth simulation, "
+        "Fama-French factor exposure, and historical stress replay.",
+        ["VaR / CVaR in dollars at selectable horizons", "Monte Carlo wealth paths",
+         "FF3 factor regression", "Stress scenarios"],
+    ))
+    st.html(ui.nav_card(
+        "correlation-analytics", "Correlation Analytics",
+        "Cross-asset correlation structure, the rolling diversification pulse, "
+        "and concentration gauges for a custom universe.",
+        ["Correlation matrix", "Rolling average pairwise correlation",
+         "PC1 variance share", "Diversification ratio"],
     ))
 
 # ── Systematic Research ───────────────────────────────────────────────────────
 
 ui.section("Systematic Research")
-c6, c7 = st.columns(2)
+c6, c7, c8 = st.columns(3)
 with c6:
     st.html(ui.nav_card(
         "equity-screening", "Equity Screening",
-        "Cross-sectional momentum and trend-quality ranking across a custom "
-        "watchlist or the S&P 500 / S&P 1500, with data-integrity exclusions.",
-        ["Composite rank score", "Trend regression diagnostics", "Extension filter",
-         "Market-cap gating"],
+        "Cross-sectional momentum and trend-quality ranking across the S&P 500 "
+        "or S&P 1500 with GICS sector filters and data-integrity exclusions.",
+        ["Composite rank score", "GICS sector filter", "Trend regression diagnostics",
+         "Extension filter"],
     ))
 with c7:
     st.html(ui.nav_card(
         "seasonality-research", "Seasonality Research",
         "Calendar-effect hypothesis testing with false-discovery-rate control, "
         "out-of-sample replication, and post-cost economics.",
-        ["20 calendar hypotheses", "Benjamini-Hochberg FDR", "In/out-of-sample replication",
+        ["20 calendar hypotheses", "Benjamini-Hochberg FDR", "Out-of-sample replication",
          "Net-of-cost assessment"],
+    ))
+with c8:
+    st.html(ui.nav_card(
+        "relative-value", "Relative Value Analysis",
+        "Pair cointegration diagnostics: hedge ratio, Engle-Granger test, "
+        "spread half-life, and the current z-score.",
+        ["OLS hedge ratio", "Engle-Granger cointegration", "Half-life of mean reversion",
+         "Spread z-score bands"],
     ))
 
 # ── Data sources ──────────────────────────────────────────────────────────────

@@ -38,15 +38,17 @@ The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit ap
 
 **Pages** (registered in `app.py` with stable `url_path`s):
 - Equity Research: `security_analytics.py`, `volatility_analytics.py`, `event_study.py`, `derivatives_workbench.py`
-- Portfolio & Risk: `portfolio_construction.py`, `risk_analytics.py`, `strategy_simulation.py`
-- Systematic Research: `equity_screening.py`, `seasonality_research.py`
+- Portfolio & Risk: `portfolio_construction.py`, `risk_analytics.py`, `strategy_simulation.py`, `correlation_analytics.py`
+- Systematic Research: `equity_screening.py`, `seasonality_research.py`, `relative_value.py`
 - Expensive pages (construction, simulation, screening) wrap parameters in `st.form` to batch reruns. Portfolio Construction stages its result in `st.session_state["portfolio_weights"/"portfolio_prices"/"portfolio_returns"/"portfolio_method"/"portfolio_cov"]` for Risk Analytics.
 
 **Data flow:**
 1. `src/data.py` defines a `Provider` ABC with `get_prices(ticker, start, end) -> DataFrame`.
 2. `YFinanceProvider` is the primary implementation; `AlphaVantageProvider` is a fallback for fundamentals (25 req/day free tier — use sparingly).
 3. `get_prices()` (the module-level function) wraps providers with a parquet cache in `cache/`. It loads from cache, checks if the requested date range is covered, and only hits the network for missing data. Delete files in `cache/` to force a refresh.
-4. Pages call `data.get_prices()` and pass the resulting DataFrame to `src/analysis.py` functions.
+4. Cache-coverage checks are **business-day clamped** (`_cache_is_stale`): a requested end of today/weekend is satisfied by a cache ending on the prior completed business day, and a weekend start by data beginning the following Monday. Without this every ticker refetches on every run, which is what rate-limits large scans.
+5. `get_prices_batch(tickers, start, end, progress_cb)` is the **universe-scale path** (used by Equity Screening and Correlation Analytics): cache-covered names skip the network entirely; stale names are batch-downloaded via chunked `yf.download(group_by="ticker")` (~100 per request) and merged back into the per-ticker parquet cache. Never loop single-name `get_prices` over hundreds of tickers — that is the rate-limited pattern that drops names.
+6. Pages call `data.get_prices()` / `get_prices_batch()` and pass the result to `src/` analytics.
 
 **`src/portfolio.py`** provides portfolio optimization:
 - `expected_returns(returns_df)`, `covariance_matrix(returns_df)` — build inputs from a returns DataFrame
@@ -91,7 +93,7 @@ The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit ap
 **Return type convention:** Use simple returns when combining assets (portfolio math); use log returns for single-series statistics. `TRADING_DAYS = 252` is the annualization constant throughout.
 
 **`src/screener.py`** provides the bullish stock screener:
-- `fetch_sp500_tickers()` — scrapes current S&P 500 from Wikipedia; normalizes BRK.B → BRK-B
+- `fetch_sp500_constituents()` / `fetch_sp400_…` / `fetch_sp600_…` / `fetch_sp1500_…` — scrape Wikipedia constituents tables, returning `Series(GICS sector, index=ticker)`; normalizes BRK.B → BRK-B. `fetch_*_tickers()` wrappers return just the list. The screening page attaches the sector column and offers a post-ranking sector filter (a slice — never re-runs the scan)
 - `fetch_ticker_prices(ticker, start, end, max_retries)` — per-ticker fetch via `data.get_prices` (parquet-cached) with exponential-backoff retry
 - `compute_signals(prices)` → DataFrame of 7 signals per ticker: `mom_12_1`, `mom_6m`, `pct_above_200sma`, `golden_cross`, `dist_52w_high`, `trend_slope`, `trend_r2`; plus informational `extension_z`/`extension_flag`. Two exclusion rules: < 80% coverage in the trailing 252-day window (`_HISTORY_MIN=202`), OR fewer than `TRADING_DAYS + _HISTORY_BUFFER` (342) total valid rows in the full fetch window — the second rule catches recent spinoffs/IPOs whose stub prices would corrupt the momentum reference at t−252
 - `score_and_rank(signals)` → cross-sectional z-scores (nanmean/nanstd) + equal-weight `composite`; NaN-aware so sparse tickers don't corrupt universe statistics
@@ -122,6 +124,10 @@ The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit ap
 **`src/options.py`** conventions: `prob_of_profit` simulates the underlying with a **single volatility** (`underlying_vol`, default `atm_leg_iv` — the leg nearest the money), never an average across legs. `payoff_bounds` determines unbounded profit/loss **analytically** from the net share exposure as S → ∞ (downside is always bounded at S=0) and reads bounded extremes off a dense grid. All terminal metrics (`breakevens`, `payoff_bounds`, `prob_of_profit`) evaluate at `eval_horizon_dte` — the **front** expiration — because a terminal-price model cannot settle expired legs path-dependently. `implied_vol` is Newton with a bisection fallback.
 
 **`src/estimators.py`**: `james_stein_mean(returns, shrinkage=None)` uses the data-driven intensity `w = min(1, (k−2)·σ̄²/‖μ−μ̄1‖²)` when `shrinkage` is None; pass a float to override.
+
+**`src/pairs.py`** (Relative Value Analysis): `analyze_pair(prices_a, prices_b)` → `PairResult` — log-price OLS hedge ratio, Engle-Granger cointegration (`coint`, the primary criterion because it accounts for the estimated hedge ratio), reference ADF on the spread, AR(1) half-life (`−ln2/ln(1+b)`, NaN unless −1 < b < 0), and a full-sample spread z-score. Raises `ValueError` below 120 overlapping sessions.
+
+**`src/correlation.py`** (Correlation Analytics): `correlation_matrix`, `mean_offdiag_correlation`, `rolling_mean_correlation(returns, window)` (average pairwise correlation per date — the diversification pulse), `rolling_pair_correlation`, `pc1_variance_share` (top eigenvalue share of the correlation matrix), `diversification_ratio` (Choueifaty-Coignard), `extreme_pairs`.
 
 **`src/theme.py`** is the single source of truth for design tokens and chart styling (pure Python, no Streamlit):
 - Surfaces (`CANVAS`, `SURFACE`, `BORDER`, …), text (`TEXT`, `TEXT_MUTED`, …), semantic series palette (`PRIMARY`, `BENCHMARK`, `POSITIVE`, `NEGATIVE`, `NEUTRAL`), opacity variants (`PRIMARY_10/18/28/80`), fonts (`FONT_UI` Inter, `FONT_MONO` IBM Plex Mono)

@@ -199,11 +199,22 @@ with ui.panel("Payoff Profile"):
             "settlement assumptions that a terminal-price model cannot represent.",
         )
 
-    days_eval = st.slider(
-        "Valuation Date (calendar days forward)",
-        min_value=0, max_value=front_dte, value=front_dte, step=1,
-        help="0 = trade date (mid-curve Black-Scholes value); maximum = front expiration.",
-    )
+    pcol1, pcol2 = st.columns(2)
+    with pcol1:
+        days_eval = st.slider(
+            "Valuation Date (calendar days forward)",
+            min_value=0, max_value=front_dte, value=front_dte, step=1,
+            help="0 = trade date (mid-curve Black-Scholes value); maximum = front expiration.",
+        )
+    with pcol2:
+        iv_shock_pts = st.slider(
+            "Implied Volatility Shock (vol points)",
+            min_value=-20, max_value=20, value=0, step=1,
+            help="Shifts every option leg's implied volatility by this many "
+                 "points (e.g. +5 maps 30% to 35%) at the valuation date — a "
+                 "vega scenario for earnings crush or volatility spikes. "
+                 "Entry premiums are unchanged.",
+        )
 
     S_lo = max(S0 * 0.40, 0.01)
     S_hi = S0 * 1.80
@@ -211,6 +222,35 @@ with ui.panel("Payoff Profile"):
 
     pnl_now = op.position_pnl(legs, S_range, S0, r, q, days_elapsed=days_eval)
     pnl_exp = op.position_pnl(legs, S_range, S0, r, q, days_elapsed=front_dte)
+
+    def _entry_value(legs_: list[op.Leg]) -> float:
+        """Signed total entry cost of the position, priced at each leg's own IV."""
+        total = 0.0
+        for l in legs_:
+            sign = 1 if l.direction == "long" else -1
+            res = op.price_leg(l, S0, S0, r, q, days_elapsed=0)
+            total += sign * l.quantity * op.CONTRACT_MULTIPLIER * res.entry_price
+        return total
+
+    pnl_shocked = None
+    if iv_shock_pts != 0:
+        shocked_legs = [
+            op.Leg(
+                option_type=l.option_type, direction=l.direction, strike=l.strike,
+                dte=l.dte,
+                iv=(max(l.iv + iv_shock_pts / 100.0, 0.01)
+                    if l.option_type != "stock" else l.iv),
+                quantity=l.quantity,
+            )
+            for l in legs
+        ]
+        # position_pnl(shocked_legs) nets against an entry priced at the SHOCKED
+        # IVs, but the trade was entered at the original IVs — add back the
+        # difference in entry value so only the current valuation is shocked.
+        pnl_shocked = (
+            op.position_pnl(shocked_legs, S_range, S0, r, q, days_elapsed=days_eval)
+            + (_entry_value(shocked_legs) - _entry_value(legs))
+        )
 
     fig_pnl = go.Figure()
     fig_pnl.add_trace(go.Scatter(
@@ -223,6 +263,12 @@ with ui.panel("Payoff Profile"):
         line=dict(color=PRIMARY, width=2.5),
         name=f"Day {days_eval} valuation",
     ))
+    if pnl_shocked is not None:
+        fig_pnl.add_trace(go.Scatter(
+            x=S_range, y=pnl_shocked, mode="lines",
+            line=dict(color=BENCHMARK, width=2),
+            name=f"Day {days_eval}, IV {iv_shock_pts:+d} pts",
+        ))
     fig_pnl.add_hline(y=0, line_color=REFLINE, line_width=1)
     fig_pnl.add_vline(
         x=S0, line_dash="dot", line_color=BENCHMARK, line_width=1.5,
