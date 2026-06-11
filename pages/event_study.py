@@ -29,7 +29,7 @@ today = date.today()
 with ui.panel("Parameters"):
     c1, c2, c3 = st.columns([1, 1, 1.4])
     with c1:
-        ticker = st.text_input("Instrument", value="AAPL").upper().strip()
+        ticker = st.text_input("Instrument", value=ui.get_default_ticker("AAPL")).upper().strip()
     with c2:
         benchmark = st.text_input("Benchmark", value="SPY").upper().strip()
     with c3:
@@ -198,6 +198,7 @@ if multi_mode and len(event_dates) > 1:
             st.stop()
 
     ui.data_asof_caption(result.data_through)
+    ui.remember_ticker(ticker)
     n_events = len(result.per_event)
     ui.kpi_row([
         {"label": "Events Processed", "value": f"{n_events}"},
@@ -248,7 +249,9 @@ if multi_mode and len(event_dates) > 1:
                 "Beta":        f"{e.fit.beta:.3f}",
                 "R²":          f"{e.fit.r_squared:.3f}",
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        detail_df = pd.DataFrame(rows)
+        st.dataframe(detail_df, hide_index=True, width="stretch")
+        ui.download_row(detail_df, f"event_study_{ticker}")
 
 else:
     ed = event_dates[0]
@@ -264,6 +267,7 @@ else:
             st.stop()
 
     ui.data_asof_caption(result.data_through)
+    ui.remember_ticker(ticker)
     fit = result.fit
     ui.kpi_row([
         {"label": "Alpha (daily)", "value": f"{fit.alpha*100:.4f}%"},

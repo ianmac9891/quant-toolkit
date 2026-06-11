@@ -42,7 +42,7 @@ with st.form("screen_params"):
         )
         raw_watchlist = st.text_area(
             "Watchlist (used when Custom is selected)",
-            "AAPL\nMSFT\nNVDA\nGOOGL\nAMZN\nMETA\nTSLA\nJPM\nV\nUNH",
+            ui.get_default_universe("AAPL\nMSFT\nNVDA\nGOOGL\nAMZN\nMETA\nTSLA\nJPM\nV\nUNH"),
             height=150,
             help="One symbol per line or comma-separated.",
         )
@@ -122,6 +122,9 @@ else:
 if not tickers_input:
     ui.banner("warn", "Specify at least one symbol.")
     st.stop()
+
+if universe_mode == "Custom watchlist":
+    ui.remember_universe(tickers_input)
 
 tickers_key = tuple(sorted(tickers_input))
 n_requested = len(tickers_key)
@@ -269,9 +272,10 @@ with ui.panel("Composite Ranking"):
             height=520,
         )
 
-        csv = ranked[[c for c in display_cols if c in ranked.columns]].reset_index().to_csv(index=False)
-        st.download_button("Export Full Results (CSV)", csv,
-                           file_name="screen_results.csv", mime="text/csv")
+        ui.download_row(
+            ranked[[c for c in display_cols if c in ranked.columns]],
+            "screen_results",
+        )
 
 # ── Scatter ───────────────────────────────────────────────────────────────────
 

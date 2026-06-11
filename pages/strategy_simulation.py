@@ -38,7 +38,8 @@ with st.form("simulation_params"):
     st.markdown('<p class="qrt-kicker">Simulation Parameters</p>', unsafe_allow_html=True)
     c1, c2 = st.columns([1, 1.8])
     with c1:
-        tickers = ui.ticker_list_input("Investment Universe", "SPY\nTLT\nGLD", height=110)
+        tickers = ui.ticker_list_input("Investment Universe",
+                                       ui.get_default_universe("SPY\nTLT\nGLD"), height=110)
         add_spy = st.checkbox("Overlay S&P 500 (SPY) on the equity curve", value=True)
     with c2:
         cc1, cc2 = st.columns(2)
@@ -146,6 +147,7 @@ if price_df.shape[1] < 2:
     ui.banner("error", "At least two instruments with overlapping history are required.")
     st.stop()
 
+ui.remember_universe(list(price_df.columns))
 ui.data_asof_caption(price_df.index.max())
 
 spy_series: pd.Series | None = None
@@ -400,6 +402,7 @@ with ui.panel("Calendar-Year Returns"):
             },
             width="stretch",
         )
+        ui.download_row(yr_df, "calendar_year_returns")
         st.caption(
             "Partial first and last years cover only the simulated portion of the "
             "calendar year. The warm-up period is excluded."
@@ -416,6 +419,7 @@ with st.expander(f"Rebalance Ledger ({n_trades} rebalance{'s' if n_trades != 1 e
         display_log["turnover"] = display_log["turnover"].map("{:.1%}".format)
         display_log["cost_pct"] = display_log["cost_pct"].map("{:.3%}".format)
         st.dataframe(display_log, width="stretch")
+        ui.download_row(result.trade_log, "rebalance_ledger")
 
 with st.expander("Target Weight History"):
     wh = result.weights_history

@@ -43,7 +43,8 @@ with st.form("construction_params"):
     c1, c2 = st.columns([1, 1.6])
     with c1:
         tickers = ui.ticker_list_input(
-            "Investment Universe", "AAPL\nMSFT\nGOOGL\nSPY\nTLT\nGLD", height=150)
+            "Investment Universe",
+            ui.get_default_universe("AAPL\nMSFT\nGOOGL\nSPY\nTLT\nGLD"), height=150)
     with c2:
         cc1, cc2 = st.columns(2)
         with cc1:
@@ -118,6 +119,7 @@ if price_df.shape[1] < 2:
     ui.banner("error", "At least two instruments with overlapping history are required.")
     st.stop()
 
+ui.remember_universe(list(price_df.columns))
 ui.data_asof_caption(price_df.index.max())
 
 active_tickers = list(price_df.columns)
@@ -378,11 +380,10 @@ with st.expander("Allocation Detail and Export"):
     })
     st.dataframe(detail_df, width="stretch")
 
-    csv_bytes = pd.DataFrame({
-        "ticker": opt_result.weights.index,
-        "weight": opt_result.weights.values,
-    }).to_csv(index=False)
-    st.download_button("Export Allocation (CSV)", csv_bytes,
-                       file_name=f"allocation_{method}.csv", mime="text/csv")
+    ui.download_row(
+        pd.DataFrame({"weight": opt_result.weights.values},
+                     index=opt_result.weights.index),
+        f"allocation_{method}",
+    )
 
 ui.footer_disclaimer()

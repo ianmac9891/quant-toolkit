@@ -27,7 +27,7 @@ with ui.panel("Parameters"):
     c1, c2 = st.columns([1, 1.8])
     with c1:
         tickers = ui.ticker_list_input(
-            "Universe", "SPY\nQQQ\nIWM\nTLT\nGLD\nHYG\nUUP", height=150,
+            "Universe", ui.get_default_universe("SPY\nQQQ\nIWM\nTLT\nGLD\nHYG\nUUP"), height=150,
             help="Two to roughly twenty instruments. Mixed asset classes show "
                  "the diversification structure best.",
         )
@@ -76,6 +76,7 @@ if price_df.shape[1] < 2 or len(price_df) < 60:
     ui.banner("error", "At least two instruments with 60+ overlapping sessions are required.")
     st.stop()
 
+ui.remember_universe(list(price_df.columns))
 ui.data_asof_caption(price_df.index.max())
 
 returns_df = price_df.pct_change().dropna()
@@ -123,6 +124,7 @@ with ui.panel(f"Return Correlation Matrix — {len(returns_df):,} sessions"):
     )
     apply_chart_theme(hm)
     st.plotly_chart(hm, width="stretch", config=CHART_CONFIG)
+    ui.download_row(corr.round(4), "correlation_matrix")
 
 # ── Rolling average correlation ───────────────────────────────────────────────
 

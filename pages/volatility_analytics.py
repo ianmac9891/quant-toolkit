@@ -40,7 +40,7 @@ today = date.today()
 with ui.panel("Parameters"):
     c1, c2, c3, c4 = st.columns([1, 1.3, 1.2, 1.2])
     with c1:
-        ticker = st.text_input("Instrument", value="SPY").upper().strip()
+        ticker = st.text_input("Instrument", value=ui.get_default_ticker("SPY")).upper().strip()
     with c2:
         fit_start = st.date_input(
             "Estimation Window Start",
@@ -101,6 +101,7 @@ if not result.ok or "adj_close" not in result.df.columns:
     ui.data_unavailable(f"{ticker}: {result.error or 'no usable columns'}")
     st.stop()
 price_df = result.df
+ui.remember_ticker(ticker)
 ui.data_asof_caption(result.asof, result.source)
 
 prices        = price_df["adj_close"].dropna()

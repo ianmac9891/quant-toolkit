@@ -159,6 +159,20 @@ hr {{ border-color: var(--border) !important; margin: 1.6rem 0 !important; }}
 .stButton > button[kind="primary"]:hover {{
     filter: brightness(1.1);
 }}
+/* Tertiary: quiet text-style action used for table exports */
+[data-testid="stDownloadButton"] > button[kind="tertiary"],
+.stButton > button[kind="tertiary"] {{
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-faint) !important;
+    font-size: 11.5px !important;
+    min-height: 30px;
+    padding: 0.1rem 0.3rem !important;
+}}
+[data-testid="stDownloadButton"] > button[kind="tertiary"]:hover,
+.stButton > button[kind="tertiary"]:hover {{
+    color: var(--accent) !important;
+}}
 
 /* ── Tables ── */
 [data-testid="stDataFrame"] {{
@@ -582,6 +596,56 @@ def pd_date_str(ts) -> str:
         return str(ts.date()) if hasattr(ts, "date") else str(ts)
     except Exception:
         return str(ts)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cross-page session context
+#
+# The last-used instrument and universe follow the analyst across tools:
+# entering NVDA on Security Analytics pre-fills Volatility Analytics, the
+# chain explorer, and so on. Stored in session_state, so the context lives
+# exactly as long as the browser session.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_TICKER_KEY = "qrt_last_ticker"
+_UNIVERSE_KEY = "qrt_last_universe"
+
+
+def get_default_ticker(fallback: str = "SPY") -> str:
+    return st.session_state.get(_TICKER_KEY, fallback)
+
+
+def remember_ticker(ticker: str) -> None:
+    if ticker:
+        st.session_state[_TICKER_KEY] = ticker.upper().strip()
+
+
+def get_default_universe(fallback: str) -> str:
+    """Returns newline-joined text suitable as a text_area default."""
+    stored = st.session_state.get(_UNIVERSE_KEY)
+    return "\n".join(stored) if stored else fallback
+
+
+def remember_universe(tickers: list[str]) -> None:
+    if tickers:
+        st.session_state[_UNIVERSE_KEY] = list(tickers)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Exports
+# ──────────────────────────────────────────────────────────────────────────────
+
+def download_row(df, filename_stem: str) -> None:
+    """Right-aligned, quietly styled CSV export under a results table."""
+    csv_bytes = df.to_csv().encode("utf-8")
+    _, col = st.columns([4.2, 1.0])
+    with col:
+        st.download_button(
+            "Export CSV", csv_bytes,
+            file_name=f"{filename_stem}.csv", mime="text/csv",
+            type="tertiary",
+            key=f"dl_{filename_stem}",
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

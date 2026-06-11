@@ -26,7 +26,7 @@ today = date.today()
 with ui.panel("Parameters"):
     c1, c2, c3 = st.columns([1, 1.3, 1.3])
     with c1:
-        ticker = st.text_input("Instrument", value="SPY").upper().strip()
+        ticker = st.text_input("Instrument", value=ui.get_default_ticker("SPY")).upper().strip()
     with c2:
         start_date = st.date_input(
             "Sample Start",
@@ -64,6 +64,7 @@ if not result.ok or "adj_close" not in result.df.columns:
     ui.data_unavailable(f"{ticker}: {result.error or 'no usable columns'}")
     st.stop()
 price_df = result.df
+ui.remember_ticker(ticker)
 ui.data_asof_caption(result.asof, result.source)
 
 prices = price_df["adj_close"]
@@ -221,6 +222,7 @@ for cat in categories:
             else:
                 st.dataframe(df, column_config=_TABLE_CFG,
                              width="stretch", hide_index=True)
+                ui.download_row(df, f"seasonality_{cat.name.lower().replace(' ', '_')}")
             st.caption(
                 "Gap (pp): positive-close rate on signal days minus all other days, "
                 "in percentage points. The in/out-of-sample split is at the sample "

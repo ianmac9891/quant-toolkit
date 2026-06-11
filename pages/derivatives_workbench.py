@@ -35,9 +35,12 @@ with ui.panel("Market Parameters"):
     c1, c2, c3, c4 = st.columns([1.3, 1, 1, 1])
     with c1:
         spot_ticker = st.text_input(
-            "Prefill Underlying From Symbol (optional)", value="",
+            "Prefill Underlying From Symbol (optional)",
+            value=ui.get_default_ticker(""),
             help="Enter a symbol to load the latest closing price as the underlying level.",
         ).upper().strip()
+    if spot_ticker:
+        ui.remember_ticker(spot_ticker)
     default_spot = _latest_close(spot_ticker) if spot_ticker else 100.0
     with c2:
         S0 = st.number_input("Underlying Price ($)", min_value=0.01,

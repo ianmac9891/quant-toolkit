@@ -87,5 +87,12 @@ def apply_chart_theme(fig: go.Figure) -> go.Figure:
     return fig
 
 
-# Standard Plotly display config used by every page
-CHART_CONFIG = {"responsive": True, "displayModeBar": False}
+# Standard Plotly display config used by every page. The modebar is reduced
+# to the PNG export alone: enough to take a chart into a deck, nothing else.
+CHART_CONFIG = {
+    "responsive": True,
+    "displayModeBar": True,
+    "displaylogo": False,
+    "modeBarButtons": [["toImage"]],
+    "toImageButtonOptions": {"format": "png", "scale": 2, "filename": "qrt_chart"},
+}

@@ -29,7 +29,7 @@ today = date.today()
 with ui.panel("Parameters"):
     c1, c2, c3, c4 = st.columns([1, 1, 1.6, 1.2])
     with c1:
-        ticker = st.text_input("Instrument", value="AAPL").strip().upper()
+        ticker = st.text_input("Instrument", value=ui.get_default_ticker("AAPL")).strip().upper()
     with c2:
         benchmark = st.text_input("Benchmark", value="SPY",
                                   help="Reference index for relative performance. "
@@ -70,6 +70,7 @@ if not result.ok:
     ui.data_unavailable(f"{ticker}: {result.error}")
     st.stop()
 df = result.df
+ui.remember_ticker(ticker)
 
 bench_df = pd.DataFrame()
 if benchmark and benchmark != ticker:
@@ -326,5 +327,6 @@ with ui.panel("Rolling 60-Day Statistics"):
 
 with st.expander("Raw OHLCV Data (last 250 sessions)"):
     st.dataframe(df.tail(250), width="stretch")
+    ui.download_row(df.tail(250), f"{ticker}_ohlcv")
 
 ui.footer_disclaimer()

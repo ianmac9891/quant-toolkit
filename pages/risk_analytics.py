@@ -515,8 +515,9 @@ else:
                 "Equal-Weight Max DD": f"{s.equal_max_dd * 100:.1f}%",
                 "Dollar P&L":         f"${s.port_return * portfolio_value:,.0f}",
             })
-        st.dataframe(pd.DataFrame(stress_rows).set_index("Scenario"),
-                     width="stretch")
+        stress_df = pd.DataFrame(stress_rows).set_index("Scenario")
+        st.dataframe(stress_df, width="stretch")
+        ui.download_row(stress_df, "stress_scenarios")
 
         windows  = [s.window for s in covered]
         port_ret = [s.port_return * 100 for s in covered]
