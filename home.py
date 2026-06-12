@@ -153,7 +153,8 @@ st.markdown(
     """
     <div style="margin-top: 1.6rem; font-size: 12px; color: var(--text-faint);">
     <span style="font-weight:600; letter-spacing:0.07em; text-transform:uppercase;">Data</span>
-    &nbsp;&nbsp;Yahoo Finance (primary, daily OHLCV) · Alpha Vantage (fundamentals fallback)
+    &nbsp;&nbsp;Yahoo Finance (daily OHLCV, delayed option chains, earnings dates,
+    Treasury yield indices) · Alpha Vantage (single-name fallback)
     · Ken French Data Library (factor returns). Prices are cached locally in Parquet.
     </div>
     """,

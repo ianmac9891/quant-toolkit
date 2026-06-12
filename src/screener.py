@@ -312,10 +312,18 @@ def score_and_rank(signals: pd.DataFrame) -> pd.DataFrame:
 
 # ── Info columns ──────────────────────────────────────────────────────────────
 
-def fetch_market_caps(tickers: list[str], max_workers: int = 20) -> pd.Series:
+def fetch_market_caps(
+    tickers: list[str],
+    max_workers: int = 20,
+    total_timeout: float = 120.0,
+) -> pd.Series:
     """
     Market cap via fast_info.market_cap — fast, reliable, gates the filter.
-    One retry on failure.
+    One retry on failure. The hard total timeout matters in production: when
+    Yahoo throttles the shared egress IP, individual fast_info calls hang
+    rather than fail, and without the cap the whole page stalls with them.
+    Names not resolved in time come back NaN, which the filter treats as
+    a pass-through rather than an exclusion.
     """
     def _get(t: str) -> tuple[str, float]:
         for _ in range(2):
@@ -326,10 +334,15 @@ def fetch_market_caps(tickers: list[str], max_workers: int = 20) -> pd.Series:
                 time.sleep(0.2)
         return t, float("nan")
 
-    results: dict[str, float] = {}
+    results: dict[str, float] = {t: float("nan") for t in tickers}
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        for t, val in ex.map(_get, tickers):
-            results[t] = val
+        futures = {ex.submit(_get, t): t for t in tickers}
+        try:
+            for fut in as_completed(futures, timeout=total_timeout):
+                t, val = fut.result()
+                results[t] = val
+        except FuturesTimeout:
+            pass   # throttled: keep whatever resolved, NaN the rest
     return pd.Series(results, name="market_cap")
 
 

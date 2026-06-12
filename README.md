@@ -1,155 +1,101 @@
-# Quant Toolkit
+# Quant Research Terminal
 
-A personal quantitative analysis workbench. Built to be extended.
+A sidebar-free Streamlit research terminal for equity, derivatives, portfolio,
+and macro analysis. Pure-Python analytics live in `src/` and the UI is a thin
+layer on top, so every model is importable from a notebook or script without
+touching Streamlit.
 
-Current tools:
-- **Stock Analysis** — historical price, returns, distribution diagnostics, risk metrics, drawdowns, rolling stats for a single ticker.
+<!-- TODO: add a home-page screenshot here (no screenshots/ dir exists yet;
+     capture the landing page at ~1280px wide and commit it under docs/). -->
 
-Coming next:
-- Portfolio Optimizer (mean-variance)
-- Risk Model (VaR, factor exposures, stress tests)
-- Backtesting Engine
+## Tools
+
+**Equity & Derivatives Research**
+- **Security Analytics** - total-return profile, drawdowns, return distribution, benchmark regression, monthly return heatmap, rolling risk statistics.
+- **Volatility Analytics** - GARCH and GJR-GARCH conditional volatility, bootstrap-simulated price distributions, regime classification.
+- **Event Study** - market-model abnormal returns with Brown-Warner, Patell, and BMP test statistics; multi-event aggregation.
+- **Earnings Move Analysis** - historical earnings-day reactions with the current option-implied move shown against the realized distribution.
+- **Derivatives Workbench** - multi-leg Black-Scholes-Merton position modeling: payoff profiles, Greeks, probability of profit, IV solver.
+- **Options Chain Explorer** - listed chains from delayed Yahoo data: IV smile and term structure, straddle-implied move, open interest and volume positioning, quote table with model deltas.
+
+**Portfolio & Risk**
+- **Portfolio Construction** - maximum Sharpe, minimum variance, and risk parity with Ledoit-Wolf and OAS shrinkage, James-Stein means, Michaud resampling, efficient frontier.
+- **Risk Analytics** - historical and parametric VaR and CVaR in dollars at selectable horizons, Monte Carlo wealth simulation, Fama-French three-factor exposure, stress-window replay.
+- **Strategy Simulation** - no-lookahead backtesting with transaction costs, walk-forward optimization, estimation versus validation segmentation.
+- **Correlation Analytics** - correlation matrix, rolling diversification pulse, PC1 variance share, diversification ratio.
+
+**Systematic Research**
+- **Equity Screening** - cross-sectional momentum and trend-quality ranking across the S&P 500 or S&P 1500 with GICS sector filters and data-integrity exclusions.
+- **Seasonality Research** - calendar-effect hypothesis testing with Benjamini-Hochberg FDR control and out-of-sample replication requirements.
+- **Relative Value Analysis** - pair cointegration: hedge ratio, Engle-Granger test, spread half-life, z-score bands.
+
+**Macro & Rates**
+- **Yield Curve Monitor** - Treasury curve snapshot and history, inversion-tracking spreads; exports the current bill rate as the app-wide risk-free default.
+
+## Data sources
+
+- **Yahoo Finance** via yfinance (daily OHLCV, option chains, earnings dates, Treasury yield indices). No key required; quotes are delayed and indicative.
+- **Alpha Vantage** as a single-ticker price fallback (free tier, 25 requests/day; key in `.env`).
+- **Ken French Data Library** for daily factor returns.
+
+Prices are cached to Parquet in `cache/` (gitignored) with an in-memory layer
+on top, so reruns and large screens stay off the network.
 
 ---
 
-## One-time setup on macOS
+## Setup
 
-You need Python 3.10+ installed. macOS ships with Python but it's usually old, so use Homebrew.
-
-**1. Install Homebrew if you don't have it.** Paste this in Terminal:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-**2. Install Python:**
-
-```bash
-brew install python@3.12
-```
-
-**3. Put this project somewhere clean.** I'd suggest `~/quant/`:
-
-```bash
-mkdir -p ~/quant
-# extract the zip you got into ~/quant so files end up at ~/quant/app.py, ~/quant/src/, etc.
-cd ~/quant
-```
-
-**4. Create a virtual environment and install dependencies.** A virtual env is just an isolated Python install that lives inside the project folder. Avoids polluting your system Python and lets different projects use different package versions.
+Requires Python 3.10+.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env   # add your Alpha Vantage key (optional but recommended)
 ```
-
-You should see `(.venv)` at the start of your terminal prompt while it's active. Run `deactivate` to leave it. Any time you reopen Terminal to use this project, run `source .venv/bin/activate` first.
-
-**5. Configure your Alpha Vantage key:**
-
-```bash
-cp .env.example .env
-# open .env in any editor and paste your AV key
-```
-
-Get a fresh key at https://www.alphavantage.co/support/#api-key. The one you pasted in chat should be rotated.
-
----
 
 ## Running
 
-From the project folder with the venv activated:
-
 ```bash
+source .venv/bin/activate
 streamlit run app.py
 ```
 
-A browser tab opens at http://localhost:8501. Use the sidebar to navigate between pages. Stop the server with `Ctrl+C` in Terminal.
+A browser tab opens at http://localhost:8501. There is no sidebar: tools are
+selected from the landing page, and each page's top bar routes back to it.
 
-That's the only terminal command you'll regularly use.
-
----
-
-## Project layout
-
-```
-quant/
-├── app.py                          # Streamlit home page (entry point)
-├── pages/                          # Each file is a sidebar nav item
-│   └── 1_📈_Stock_Analysis.py
-├── src/                            # Reusable Python modules
-│   ├── data.py                     # Data providers, cache
-│   └── analysis.py                 # Returns, risk metrics, drawdowns, VaR
-├── tests/                          # Unit tests (pytest)
-│   └── test_analysis.py
-├── cache/                          # Parquet cache of historical data (gitignored)
-├── .streamlit/config.toml          # Theme
-├── .env                            # Your API keys (gitignored, you create this)
-├── .env.example                    # Template showing required vars
-├── requirements.txt
-└── .gitignore
-```
-
-**Mental model:**
-- `src/` is the library. No Streamlit code in there. You could import these functions from a Jupyter notebook, a CLI script, or future tools.
-- `pages/` is the UI. Each page is a thin script that imports from `src/` and adds Streamlit widgets.
-- This separation means when we build the optimizer next, the data layer and risk metrics are already there to use.
-
----
-
-## Running tests
+## Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-10 tests currently. Run these before changing anything in `src/analysis.py` to make sure you haven't broken existing behavior.
+Reference-value tests, all offline: Black-Scholes-Merton against Hull's
+worked examples, put-call parity as an identity, implied-vol round-trips,
+event-study statistics on a hand-derivable synthetic fixture, pair half-life
+on a simulated OU process, and cache-staleness logic with frozen dates.
 
----
-
-## Adding new pages
-
-Drop a new file in `pages/`. The filename convention is `<number>_<emoji>_<Name>.py`:
+## Project layout
 
 ```
-pages/2_⚖️_Portfolio_Optimizer.py
-pages/3_📉_Risk_Model.py
-pages/4_🔁_Backtester.py
+quant/
+├── app.py            # st.navigation registry (hidden nav), design system injection
+├── home.py           # landing page with tool cards
+├── ui.py             # Streamlit-side design system, cached data access, session context
+├── pages/            # one thin script per tool
+├── src/              # pure-Python library: no Streamlit imports anywhere
+├── tests/            # offline reference-value tests (pytest)
+├── cache/            # Parquet price cache (gitignored)
+└── .streamlit/       # theme config
 ```
 
-The number controls sidebar order. The emoji is optional but nice.
-
----
+`src/` is the library; `pages/` is the UI. Adding a tool means a new
+`pages/<name>.py` registered in `app.py` with a `url_path` plus a nav card on
+`home.py` (see CLAUDE.md for the full conventions).
 
 ## When yfinance breaks
 
-It will. Yahoo periodically changes their endpoints. When it happens:
-
-```bash
-pip install --upgrade yfinance
-```
-
-Usually fixes it within a few days of the break.
-
-If you need a more reliable data source long-term, look at:
-- IEX Cloud (paid, but cheap)
-- Polygon.io (paid)
-- StFX library subscriptions (Bloomberg, Refinitiv) if available to you as a research assistant
-
----
-
-## Git
-
-If you want version control (recommended):
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-# create private repo on github, then:
-git remote add origin <your-repo-url>
-git push -u origin main
-```
-
-`.gitignore` already excludes secrets and cache, so this is safe to push to a private repo.
+It will; Yahoo changes endpoints periodically. `pip install --upgrade
+yfinance` usually fixes it within days. The app requires `curl_cffi` so
+yfinance can impersonate a browser TLS fingerprint, which is what keeps the
+shared Streamlit Cloud egress IP from being rate-limited.

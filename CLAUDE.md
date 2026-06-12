@@ -33,22 +33,27 @@ The app is the **Quant Research Terminal (QRT)** — a sidebar-free Streamlit ap
 - `panel(title)` — context manager wrapping `st.container(border=True)` with a kicker label
 - `kpi_row(items)`, `banner(kind, body)`, `tag(text, kind)`, `nav_card(...)`, `footer_disclaimer()`
 - `date_range_input(...)` — guards the mid-selection state of range `st.date_input` (one date picked → would crash on tuple unpack); **always use this for date ranges**
-- `rf_rate_input()` — the single risk-free convention: entered in percent, returned as decimal
+- `rf_rate_input()` — the single risk-free convention: entered in percent, returned as decimal; `get_default_rf_pct()`/`set_default_rf_pct()` carry the app-wide rate default written by the Yield Curve Monitor
+- **Data access lives here, not in pages**: `ui.fetch_prices(ticker, start, end)` (single name, returns `data.PriceResult`, never raises) and `ui.fetch_universe(tuple, start, end)` (batch) are the `@st.cache_data(ttl=3600)` wrappers over `src/data.py`. Pages must not define their own raw-price cache wrappers; derived-computation caches stay page-local. On failure render `ui.data_unavailable(detail)`; every page showing price-derived output ends its fetch with `ui.data_asof_caption(asof, source)`
+- Session context: `get_default_ticker`/`remember_ticker` and `get_default_universe`/`remember_universe` make the last-used instrument and universe follow the analyst across tools
+- `download_row(df, filename_stem)` — right-aligned tertiary CSV export; required under every results table
 - Pages never call `st.metric` / `st.info` / `st.warning` / `st.error` directly — use `kpi_row` and `banner`. No emojis or Material icons anywhere.
 
 **Pages** (registered in `app.py` with stable `url_path`s):
-- Equity Research: `security_analytics.py`, `volatility_analytics.py`, `event_study.py`, `derivatives_workbench.py`
+- Equity & Derivatives Research: `security_analytics.py`, `volatility_analytics.py`, `event_study.py`, `earnings_analysis.py`, `derivatives_workbench.py`, `options_chain.py`
 - Portfolio & Risk: `portfolio_construction.py`, `risk_analytics.py`, `strategy_simulation.py`, `correlation_analytics.py`
 - Systematic Research: `equity_screening.py`, `seasonality_research.py`, `relative_value.py`
+- Macro & Rates: `yield_curve.py` (also publishes the 13-week bill rate as the app-wide risk-free default via `ui.set_default_rf_pct`)
 - Expensive pages (construction, simulation, screening) wrap parameters in `st.form` to batch reruns. Portfolio Construction stages its result in `st.session_state["portfolio_weights"/"portfolio_prices"/"portfolio_returns"/"portfolio_method"/"portfolio_cov"]` for Risk Analytics.
 
 **Data flow:**
 1. `src/data.py` defines a `Provider` ABC with `get_prices(ticker, start, end) -> DataFrame`.
 2. `YFinanceProvider` is the primary implementation; `AlphaVantageProvider` is a fallback for fundamentals (25 req/day free tier — use sparingly).
-3. `get_prices()` (the module-level function) wraps providers with a parquet cache in `cache/`. It loads from cache, checks if the requested date range is covered, and only hits the network for missing data. Delete files in `cache/` to force a refresh.
-4. Cache-coverage checks are **business-day clamped** (`_cache_is_stale`): a requested end of today/weekend is satisfied by a cache ending on the prior completed business day, and a weekend start by data beginning the following Monday. Without this every ticker refetches on every run, which is what rate-limits large scans.
-5. `get_prices_batch(tickers, start, end, progress_cb)` is the **universe-scale path** (used by Equity Screening and Correlation Analytics): cache-covered names skip the network entirely; stale names are batch-downloaded via chunked `yf.download(group_by="ticker")` (~100 per request) and merged back into the per-ticker parquet cache. Never loop single-name `get_prices` over hundreds of tickers — that is the rate-limited pattern that drops names.
-6. Pages call `data.get_prices()` / `get_prices_batch()` and pass the result to `src/` analytics.
+3. `fetch_prices(ticker, start, end) -> PriceResult` is the resilient single-name entry point: yfinance, one retry with backoff, Alpha Vantage fallback (never used for universes), typed result with `ok`/`error`/`asof`/`source`. yfinance ≥ 1.4 with curl_cffi manages its own browser-impersonating session — never pass a custom `requests.Session`.
+4. `get_prices()` (the module-level function) wraps providers with a parquet cache in `cache/`. It loads from cache, checks if the requested date range is covered, and only hits the network for missing data. Delete files in `cache/` to force a refresh.
+5. Cache-coverage checks are **business-day clamped** (`_cache_is_stale`): a requested end of today/weekend is satisfied by a cache ending on the prior completed business day, and a weekend start by data beginning the following Monday. Without this every ticker refetches on every run, which is what rate-limits large scans.
+6. `get_prices_batch(tickers, start, end, progress_cb)` is the **universe-scale path** (used by Equity Screening and Correlation Analytics): cache-covered names skip the network entirely; stale names are batch-downloaded via chunked `yf.download(group_by="ticker")` (~100 per request) and merged back into the per-ticker parquet cache. Never loop single-name `get_prices` over hundreds of tickers — that is the rate-limited pattern that drops names.
+7. Pages access prices through `ui.fetch_prices` / `ui.fetch_universe` (the cached wrappers) and pass the result to `src/` analytics.
 
 **`src/portfolio.py`** provides portfolio optimization:
 - `expected_returns(returns_df)`, `covariance_matrix(returns_df)` — build inputs from a returns DataFrame
